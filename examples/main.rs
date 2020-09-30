@@ -1,4 +1,4 @@
-use staticmap_rs::{Line, StaticMap, Color};
+use staticmap::{Line, StaticMap, Color};
 
 fn main() {
     let mut map = StaticMap {
