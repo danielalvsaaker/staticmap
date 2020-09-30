@@ -6,6 +6,7 @@ edition = "2018"
 description = "Static map generator"
 repository = "https://github.com/danielalvsaaker/staticmap"
 readme = "README.md"
+license = "LICENSE.md"
 categories = ["multimedia::images"]
 keywords = ["openstreetmap", "osm", "map"]
 
