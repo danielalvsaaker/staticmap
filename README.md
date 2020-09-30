@@ -1,1 +1,1 @@
-# staticmap-rs
+# staticmap
