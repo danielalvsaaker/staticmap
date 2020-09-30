@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-image = "*"
+image = { version = "0.23.10", default-features = false, features = ["png"] }
 rayon = "1.1"
-reqwest = { version = "0.10", features = ["blocking"] }
-imageproc = "*"
+attohttpc = "0.15"
+raqote = { version = "0.8.0", default-features = false }
