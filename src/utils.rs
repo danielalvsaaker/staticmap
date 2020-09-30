@@ -22,6 +22,7 @@ pub fn into_rgba(target: raqote::DrawTarget) -> Vec<u8> {
     output
 }
 
+// Rewrite of image::imageops::replace for allowing negative pixel values.
 pub fn replace<I, J>(bottom: &mut I, top: &J, x: i32, y: i32)
 where
     I: image::GenericImage,
