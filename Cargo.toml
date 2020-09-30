@@ -16,5 +16,5 @@ keywords = ["openstreetmap", "osm", "map"]
 [dependencies]
 image = { version = "0.23.10", default-features = false, features = ["png"] }
 rayon = "1.1"
-attohttpc = "0.15"
+attohttpc = { version = "0.15", default-features = false, features = ["tls-rustls"] }
 raqote = { version = "0.8.0", default-features = false }
