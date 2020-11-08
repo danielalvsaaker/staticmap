@@ -31,10 +31,13 @@ where
     let bottom_dims = bottom.dimensions();
     let top_dims = top.dimensions();
 
-
     for (top_x, pos_x) in (0..top_dims.0).zip(x..(top_dims.0 as i32 + x)) {
         for (top_y, pos_y) in (0..top_dims.1).zip(y..(top_dims.1 as i32 + y)) {
-            if pos_x >= 0 && pos_y >= 0 && pos_x < bottom_dims.0 as i32 && pos_y < bottom_dims.1 as i32 {
+            if pos_x >= 0
+                && pos_y >= 0
+                && pos_x < bottom_dims.0 as i32
+                && pos_y < bottom_dims.1 as i32
+            {
                 let p = top.get_pixel(top_x, top_y);
                 bottom.put_pixel(pos_x as u32, pos_y as u32, p);
             }
