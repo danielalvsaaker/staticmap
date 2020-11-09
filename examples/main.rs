@@ -1,6 +1,6 @@
-use staticmap::{Color, Line, StaticMap};
+use staticmap::{Color, Line, StaticMap, StaticMapError};
 
-fn main() {
+fn main() -> Result<(), StaticMapError> {
     let mut map = StaticMap {
         width: 400,
         height: 400,
@@ -43,6 +43,8 @@ fn main() {
     map.add_line(underline);
     map.add_line(line);
 
-    let image = map.render();
-    image.save("render.png").unwrap();
+    let image = map.render()?;
+    image.save("render.png")?;
+
+    Ok(())
 }

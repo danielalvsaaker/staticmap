@@ -1,15 +1,21 @@
 use attohttpc::Session;
 use core::f64::consts::PI;
-use image::imageops::{overlay, resize, FilterType};
-use image::{ColorType, DynamicImage, ImageFormat, RgbaImage};
-use raqote::*;
+use image::{
+    imageops::{overlay, resize, FilterType},
+    ColorType, DynamicImage, ImageFormat, RgbaImage,
+};
+use raqote::{DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Source, StrokeStyle};
 use rayon::prelude::*;
 
 pub use image::ImageFormat::Png;
 pub use raqote::SolidSource as Color;
 
+mod error;
 mod utils;
+pub use error::StaticMapError;
 use utils::{into_rgba, replace};
+
+type Result<T> = std::result::Result<T, StaticMapError>;
 
 pub struct Line {
     pub coordinates: Vec<(f64, f64)>,
@@ -22,10 +28,10 @@ impl Line {
     fn extent(&self) -> (f64, f64, f64, f64) {
         let coordinates = &self.coordinates;
         let (lon_min, lat_min, lon_max, lat_max) = (
-            coordinates.iter().map(|x| x.0).fold(0. / 0., f64::min),
-            coordinates.iter().map(|x| x.1).fold(0. / 0., f64::min),
-            coordinates.iter().map(|x| x.0).fold(0. / 0., f64::max),
-            coordinates.iter().map(|x| x.1).fold(0. / 0., f64::max),
+            coordinates.iter().map(|x| x.0).fold(f64::NAN, f64::min),
+            coordinates.iter().map(|x| x.1).fold(f64::NAN, f64::min),
+            coordinates.iter().map(|x| x.0).fold(f64::NAN, f64::max),
+            coordinates.iter().map(|x| x.1).fold(f64::NAN, f64::max),
         );
 
         (lon_min, lat_min, lon_max, lat_max)
@@ -49,9 +55,11 @@ impl StaticMap {
         self.lines.push(line);
     }
 
-    pub fn render(&mut self) -> RgbaImage {
+    pub fn render(&mut self) -> Result<RgbaImage> {
         if self.lines.is_empty() {
-            panic!("Cannot render empty map, add a line first.");
+            return Err(StaticMapError::MapError(String::from(
+                "Cannot render an empty map. Add a line first.",
+            )));
         }
 
         self.zoom = self.calculate_zoom();
@@ -71,18 +79,16 @@ impl StaticMap {
 
         let mut plot: Vec<u8> = Vec::new();
 
-        image::png::PngEncoder::new(&mut plot)
-            .encode(
-                &into_rgba(self.draw_features()),
-                self.width * 2,
-                self.height * 2,
-                ColorType::Rgba8,
-            )
-            .unwrap();
+        image::png::PngEncoder::new(&mut plot).encode(
+            &into_rgba(self.draw_features()),
+            self.width * 2,
+            self.height * 2,
+            ColorType::Rgba8,
+        )?;
 
         // Loads plot from slice to DynamicImage, and resizes to size of StaticMap
         let resized = resize(
-            &image::load_from_memory_with_format(&plot, ImageFormat::Png).unwrap(),
+            &image::load_from_memory_with_format(&plot, ImageFormat::Png)?,
             self.width,
             self.height,
             FilterType::CatmullRom,
@@ -90,7 +96,7 @@ impl StaticMap {
 
         overlay(&mut image, &resized, 0, 0);
 
-        image
+        Ok(image)
     }
 
     fn determine_extent(&self) -> (f64, f64, f64, f64) {
@@ -99,10 +105,10 @@ impl StaticMap {
             extent.push(line.extent());
         }
 
-        let lon_min: f64 = extent.iter().map(|x| x.0).fold(0. / 0., f64::min);
-        let lat_min: f64 = extent.iter().map(|x| x.1).fold(0. / 0., f64::min);
-        let lon_max: f64 = extent.iter().map(|x| x.2).fold(0. / 0., f64::max);
-        let lat_max: f64 = extent.iter().map(|x| x.3).fold(0. / 0., f64::max);
+        let lon_min: f64 = extent.iter().map(|x| x.0).fold(f64::NAN, f64::min);
+        let lat_min: f64 = extent.iter().map(|x| x.1).fold(f64::NAN, f64::min);
+        let lon_max: f64 = extent.iter().map(|x| x.2).fold(f64::NAN, f64::max);
+        let lat_max: f64 = extent.iter().map(|x| x.3).fold(f64::NAN, f64::max);
 
         (lon_min, lat_min, lon_max, lat_max)
     }
@@ -170,17 +176,22 @@ impl StaticMap {
         let client = Session::new();
         let tile_images: Vec<DynamicImage> = tiles
             .par_iter()
-            .map(|x| {
-                let bytes = client.get(&x.2).send().unwrap().bytes().unwrap();
-                image::load_from_memory_with_format(bytes.as_slice(), ImageFormat::Png).unwrap()
+            .flat_map(|x| {
+                let bytes = client
+                    .get(&x.2)
+                    .send()
+                    .expect("Failed to send tile request")
+                    .bytes()
+                    .expect("Failed to receive tile");
+                image::load_from_memory_with_format(bytes.as_slice(), ImageFormat::Png)
             })
             .collect();
 
-        for (tile, tile_image) in tiles.iter().zip(tile_images.iter()) {
+        for (tile, tile_image) in tiles.iter().zip(tile_images) {
             let (x, y) = (tile.0, tile.1);
             let (x_px, y_px) = (self.x_to_px(x.into()), self.y_to_px(y.into()));
 
-            replace(&mut image, tile_image, x_px as i32, y_px as i32);
+            replace(&mut image, &tile_image, x_px as i32, y_px as i32);
         }
 
         image
@@ -189,7 +200,7 @@ impl StaticMap {
     fn draw_features(&self) -> DrawTarget {
         let mut draw_target = DrawTarget::new((self.width * 2) as i32, (self.height * 2) as i32);
 
-        for line in self.lines.iter() {
+        for line in &self.lines {
             let mut path_builder = PathBuilder::new();
             let mut points: Vec<(f64, f64)> = line
                 .coordinates
@@ -215,6 +226,7 @@ impl StaticMap {
             }
 
             let path = path_builder.finish();
+
             draw_target.stroke(
                 &path,
                 &Source::Solid(line.color),
@@ -251,33 +263,32 @@ fn lat_to_y(lat: &mut f64, zoom: i32) -> f64 {
         * 2f64.powi(zoom)
 }
 
-fn y_to_lat(y: f64, zoom: i32) -> f64 {
+fn _y_to_lat(y: f64, zoom: i32) -> f64 {
     (PI * (1f64 - 2f64 * y / 2f64.powi(zoom))).sinh().atan() / PI * 180f64
 }
 
-fn x_to_lon(x: f64, zoom: i32) -> f64 {
+fn _x_to_lon(x: f64, zoom: i32) -> f64 {
     x / 2f64.powi(zoom) * 360f64 - 180f64
 }
 
 fn simplify(points: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
-    let mut new_coordinates: Vec<(f64, f64)> = Vec::new();
-    let last_element = points.len() - 1usize;
+    if points.is_empty() {
+        return points;
+    }
 
-    for (index, point) in points.iter().enumerate() {
-        match Some(index) {
-            Some(0) => new_coordinates.push(*point),
-            _ if index == last_element => new_coordinates.push(*point),
-            _ => {
-                if ((new_coordinates.last().unwrap().0 - point.0).powi(2)
-                    + (new_coordinates.last().unwrap().1 - point.1).powi(2))
-                .sqrt()
-                    > 11f64
-                {
-                    new_coordinates.push(*point)
-                }
-            }
+    let (new_coordinates, points) = points.split_at(1);
+    let mut new_coordinates = new_coordinates.to_vec();
+
+    for point in points {
+        let a = new_coordinates.last().unwrap();
+        let x = ((a.0 - point.0).powi(2) + (a.1 - point.1).powi(2)).sqrt();
+
+        if x > 11f64 {
+            new_coordinates.push(*point)
         }
     }
+
+    new_coordinates.push(*points.last().unwrap());
 
     new_coordinates
 }
