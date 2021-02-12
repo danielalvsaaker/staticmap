@@ -1,50 +1,41 @@
-use staticmap::{Color, Line, StaticMap, StaticMapError};
+use staticmap::{Color, LineBuilder, StaticMapBuilder, StaticMapError};
 
 fn main() -> Result<(), StaticMapError> {
-    let mut map = StaticMap {
-        width: 400,
-        height: 400,
-        padding: (0, 0), // (x, y)
-        x_center: 0.,
-        y_center: 0.,
-        url_template: "https://a.tile.openstreetmap.org/%z/%x/%y.png".to_string(),
-        tile_size: 256,
-        lines: Vec::new(),
-        zoom: 0,
-    };
+    let mut map = StaticMapBuilder::default()
+        .width(400)
+        .height(400)
+        .url_template("https://c.tile.openstreetmap.org/%z/%x/%y.png")
+        .build()
+        .unwrap();
 
-    // (Longitude, latitude)
-    let coordinates = vec![(13.4, 52.5), (2.3, 48.9)];
+    let lat: &[f64] = &[52.5, 48.9];
+    let lon: Vec<f64> = vec![13.4, 2.3];
 
-    let line = Line {
-        coordinates: coordinates.to_owned(),
-        color: Color {
-            r: 255u8,
-            g: 0u8,
-            b: 0u8,
-            a: 255u8,
-        },
-        width: 6.,
-        simplify: true,
-    };
+    let red = Color::new(true, 255, 0, 0, 255);
+    let white = Color::new(true, 255, 255, 255, 255);
 
-    let underline = Line {
-        coordinates: coordinates.to_owned(),
-        color: Color {
-            r: 255u8,
-            g: 255u8,
-            b: 255u8,
-            a: 255u8,
-        },
-        width: 15.,
-        simplify: true,
-    };
+    let line = LineBuilder::default()
+        .lat_coordinates(lat)
+        .lon_coordinates(lon.clone())
+        .width(6.)
+        .simplify(true)
+        .color(red)
+        .build()
+        .unwrap();
+
+    let underline = LineBuilder::default()
+        .lat_coordinates(lat)
+        .lon_coordinates(lon)
+        .width(15.)
+        .simplify(true)
+        .color(white)
+        .build()
+        .unwrap();
 
     map.add_line(underline);
     map.add_line(line);
 
-    let image = map.render()?;
-    image.save("render.png")?;
+    map.save_png("test3.png")?;
 
     Ok(())
 }

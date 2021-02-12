@@ -1,53 +1,46 @@
 use attohttpc::Session;
-use core::f64::consts::PI;
-use image::{
-    imageops::{overlay, resize, FilterType},
-    ColorType, DynamicImage, ImageFormat, RgbaImage,
-};
-use raqote::{DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Source, StrokeStyle};
+use core::f64::consts::*;
+use derive_builder::Builder;
 use rayon::prelude::*;
-
-pub use image::ImageFormat::Png;
-pub use raqote::SolidSource as Color;
+use tiny_skia::*;
 
 mod error;
-mod utils;
+mod tools;
+
 pub use error::StaticMapError;
-use utils::{into_rgba, replace};
+pub use tools::Color;
+pub use tools::*;
 
 type Result<T> = std::result::Result<T, StaticMapError>;
 
-pub struct Line {
-    pub coordinates: Vec<(f64, f64)>,
-    pub color: Color,
-    pub width: f32,
-    pub simplify: bool,
-}
-
-impl Line {
-    fn extent(&self) -> (f64, f64, f64, f64) {
-        let coordinates = &self.coordinates;
-        let (lon_min, lat_min, lon_max, lat_max) = (
-            coordinates.iter().map(|x| x.0).fold(f64::NAN, f64::min),
-            coordinates.iter().map(|x| x.1).fold(f64::NAN, f64::min),
-            coordinates.iter().map(|x| x.0).fold(f64::NAN, f64::max),
-            coordinates.iter().map(|x| x.1).fold(f64::NAN, f64::max),
-        );
-
-        (lon_min, lat_min, lon_max, lat_max)
-    }
-}
-
+#[derive(Builder)]
 pub struct StaticMap {
+    #[builder(default = "300")]
     pub width: u32,
+    #[builder(default = "300")]
     pub height: u32,
+    #[builder(default)]
     pub padding: (u32, u32),
+    #[builder(setter(skip))]
     pub x_center: f64,
+    #[builder(setter(skip))]
     pub y_center: f64,
+    #[builder(default, setter(strip_option))]
+    pub lat_center: Option<f64>,
+    #[builder(default, setter(strip_option))]
+    pub lon_center: Option<f64>,
+    #[builder(setter(into))]
     pub url_template: String,
+    #[builder(default = "256")]
     pub tile_size: u32,
-    pub lines: Vec<Line>,
-    pub zoom: i32,
+    #[builder(setter(skip))]
+    lines: Vec<Line>,
+    //#[builder(setter(skip))]
+    //markers: Vec<Box<dyn Marker>>,
+    #[builder(setter(skip))]
+    extent: (f64, f64, f64, f64),
+    #[builder(setter(strip_option), default)]
+    pub zoom: Option<u8>,
 }
 
 impl StaticMap {
@@ -55,83 +48,90 @@ impl StaticMap {
         self.lines.push(line);
     }
 
-    pub fn render(&mut self) -> Result<RgbaImage> {
-        if self.lines.is_empty() {
-            return Err(StaticMapError::MapError(String::from(
-                "Cannot render an empty map. Add a line first.",
-            )));
+    /*
+    pub fn add_marker(&mut self, marker: impl Marker + 'static) {
+        self.markers.push(Box::new(marker));
+    }
+    */
+
+    pub fn encode_png(&mut self) -> Result<Vec<u8>> {
+        self.render()?
+            .encode_png()
+            .map_err(|_| StaticMapError::MapError("Png encoding error".into()))
+    }
+
+    pub fn save_png<P: AsRef<::std::path::Path>>(&mut self, path: P) -> Result<()> {
+        self.render()?
+            .save_png(path)
+            .map_err(|_| StaticMapError::MapError("Png encoding error".into()))
+    }
+
+    fn render(&mut self) -> Result<Pixmap> {
+        self.determine_extent();
+
+        if self.zoom.is_none() {
+            self.zoom = Some(self.calculate_zoom());
         }
 
-        self.zoom = self.calculate_zoom();
+        let (lon_center, lat_center) =
+            if let (Some(x), Some(y)) = (self.lon_center, self.lat_center) {
+                (x, y)
+            } else {
+                (
+                    (self.extent.0 + self.extent.2) / 2.0,
+                    (self.extent.1 + self.extent.3) / 2.0,
+                )
+            };
 
-        let extent = self.determine_extent();
+        self.x_center = lon_to_x(lon_center, self.zoom.unwrap());
+        self.y_center = lat_to_y(lat_center, self.zoom.unwrap());
 
-        let mut lon_center = (extent.0 + extent.2) / 2.0;
-        let mut lat_center = (extent.1 + extent.3) / 2.0;
-        self.x_center = lon_to_x(&mut lon_center, self.zoom);
-        self.y_center = lat_to_y(&mut lat_center, self.zoom);
+        let mut image = Pixmap::new(self.width, self.height).unwrap();
+        self.draw_base_layer(&mut image);
 
-        let mut image = RgbaImage::new(self.width, self.height);
-        image = self.draw_base_layer(image);
-
-        // Define a png encoder, which encodes the plot to the png format and writes to the
-        // plot-vector
-
-        let mut plot: Vec<u8> = Vec::new();
-
-        image::png::PngEncoder::new(&mut plot).encode(
-            &into_rgba(self.draw_features()),
-            self.width * 2,
-            self.height * 2,
-            ColorType::Rgba8,
-        )?;
-
-        // Loads plot from slice to DynamicImage, and resizes to size of StaticMap
-        let resized = resize(
-            &image::load_from_memory_with_format(&plot, ImageFormat::Png)?,
-            self.width,
-            self.height,
-            FilterType::CatmullRom,
-        );
-
-        overlay(&mut image, &resized, 0, 0);
+        if !self.lines.is_empty() {
+            image.draw_pixmap(
+                0,
+                0,
+                self.draw_features().as_ref(),
+                &PixmapPaint::default(),
+                Transform::from_scale(0.5, 0.5),
+                None,
+            );
+        }
 
         Ok(image)
     }
 
-    fn determine_extent(&self) -> (f64, f64, f64, f64) {
-        let mut extent: Vec<(f64, f64, f64, f64)> = Vec::new();
-        for line in &self.lines {
-            extent.push(line.extent());
-        }
+    fn determine_extent(&mut self) {
+        let extent: Vec<(f64, f64, f64, f64)> = self.lines.iter().map(Tool::extent).collect();
 
         let lon_min: f64 = extent.iter().map(|x| x.0).fold(f64::NAN, f64::min);
         let lat_min: f64 = extent.iter().map(|x| x.1).fold(f64::NAN, f64::min);
         let lon_max: f64 = extent.iter().map(|x| x.2).fold(f64::NAN, f64::max);
         let lat_max: f64 = extent.iter().map(|x| x.3).fold(f64::NAN, f64::max);
 
-        (lon_min, lat_min, lon_max, lat_max)
+        self.extent = (lon_min, lat_min, lon_max, lat_max);
     }
 
-    fn calculate_zoom(&self) -> i32 {
-        let mut zoom: i32 = 0;
+    fn calculate_zoom(&self) -> u8 {
+        let mut zoom: u8 = 1;
 
-        for z in (-1..=17).rev() {
-            let mut extent = self.determine_extent();
+        let height =
+            |i| (lat_to_y(self.extent.1, i) - lat_to_y(self.extent.3, i)) * self.tile_size as f64;
+        let width =
+            |i| (lon_to_x(self.extent.2, i) - lon_to_x(self.extent.0, i)) * self.tile_size as f64;
 
-            let width: f64 =
-                (lon_to_x(&mut extent.2, z) - lon_to_x(&mut extent.0, z)) * self.tile_size as f64;
-            if width > (self.width - self.padding.0 * 2).into() {
+        for z in (0..=17).rev() {
+            if width(z) > (self.width - self.padding.0 * 2) as f64 {
                 continue;
             }
 
-            let height =
-                (lat_to_y(&mut extent.1, z) - lat_to_y(&mut extent.3, z)) * self.tile_size as f64;
-            if height > (self.height - self.padding.1 * 2) as f64 {
+            if height(z) > (self.height - self.padding.1 * 2) as f64 {
                 continue;
             }
 
-            zoom = z as i32;
+            zoom = z;
             break;
         }
         zoom
@@ -147,7 +147,7 @@ impl StaticMap {
         px.round()
     }
 
-    fn draw_base_layer(&self, mut image: RgbaImage) -> RgbaImage {
+    fn draw_base_layer(&self, image: &mut Pixmap) {
         let x_min =
             (self.x_center - (0.5 * self.width as f64 / self.tile_size as f64)).floor() as i32;
         let y_min =
@@ -160,13 +160,13 @@ impl StaticMap {
         let mut tiles: Vec<(i32, i32, String)> = Vec::new();
         for x in x_min..x_max {
             for y in y_min..y_max {
-                let max_tile: i32 = 2i32.pow(self.zoom as u32);
+                let max_tile: i32 = 2i32.pow(self.zoom.unwrap() as u32);
                 let tile_x: i32 = (x + max_tile) % max_tile;
                 let tile_y: i32 = (y + max_tile) % max_tile;
 
                 let url = self
                     .url_template
-                    .replace("%z", &self.zoom.to_string())
+                    .replace("%z", &self.zoom.unwrap().to_string())
                     .replace("%x", &tile_x.to_string())
                     .replace("%y", &tile_y.to_string());
                 tiles.push((x, y, url));
@@ -174,16 +174,14 @@ impl StaticMap {
         }
 
         let client = Session::new();
-        let tile_images: Vec<DynamicImage> = tiles
+        let tile_images: Vec<Vec<u8>> = tiles
             .par_iter()
             .flat_map(|x| {
-                let bytes = client
+                client
                     .get(&x.2)
                     .send()
                     .expect("Failed to send tile request")
                     .bytes()
-                    .expect("Failed to receive tile");
-                image::load_from_memory_with_format(bytes.as_slice(), ImageFormat::Png)
             })
             .collect();
 
@@ -191,84 +189,66 @@ impl StaticMap {
             let (x, y) = (tile.0, tile.1);
             let (x_px, y_px) = (self.x_to_px(x.into()), self.y_to_px(y.into()));
 
-            replace(&mut image, &tile_image, x_px as i32, y_px as i32);
-        }
-
-        image
-    }
-
-    fn draw_features(&self) -> DrawTarget {
-        let mut draw_target = DrawTarget::new((self.width * 2) as i32, (self.height * 2) as i32);
-
-        for line in &self.lines {
-            let mut path_builder = PathBuilder::new();
-            let mut points: Vec<(f64, f64)> = line
-                .coordinates
-                .to_owned()
-                .iter_mut()
-                .map(|(x, y)| {
-                    (
-                        self.x_to_px(lon_to_x(x, self.zoom)) * 2f64,
-                        self.y_to_px(lat_to_y(y, self.zoom)) * 2f64,
-                    )
-                })
-                .collect();
-
-            if line.simplify {
-                points = simplify(points);
-            }
-            for (index, point) in points.iter().enumerate() {
-                let (x, y) = (point.0 as f32, point.1 as f32);
-                match index {
-                    0 => path_builder.move_to(x, y),
-                    _ => path_builder.line_to(x, y),
-                }
-            }
-
-            let path = path_builder.finish();
-
-            draw_target.stroke(
-                &path,
-                &Source::Solid(line.color),
-                &StrokeStyle {
-                    cap: LineCap::Round,
-                    join: LineJoin::Round,
-                    width: line.width,
-                    miter_limit: 10.,
-                    dash_array: vec![],
-                    dash_offset: 0.,
-                },
-                &DrawOptions::new(),
+            let pixmap = Pixmap::decode_png(&tile_image).unwrap();
+            image.draw_pixmap(
+                x_px as i32,
+                y_px as i32,
+                pixmap.as_ref(),
+                &PixmapPaint::default(),
+                Transform::default(),
+                None,
             );
         }
+    }
+
+    fn draw_features(&self) -> Pixmap {
+        let mut draw_target = Pixmap::new(self.width * 2, self.height * 2).unwrap();
+
+        for line in self.lines.iter() {
+            line.draw(self, &mut draw_target);
+        }
+
+        /*
+        for marker in self.markers.iter() {
+            marker.draw(self, &mut draw_target);
+        }
+        */
 
         draw_target
     }
 }
 
-fn lon_to_x(lon: &mut f64, zoom: i32) -> f64 {
-    if !(-180f64 <= *lon && *lon <= 180f64) {
-        *lon = (*lon + 180f64) % 360f64 - 180f64;
+fn lon_to_x(lon: f64, zoom: u8) -> f64 {
+    let mut lon = lon;
+
+    if !(-180_f64..180_f64).contains(&lon) {
+        lon = (lon + 180_f64) % 360_f64 - 180_f64;
     }
 
-    ((*lon + 180f64) / 360f64) * 2f64.powi(zoom)
+    ((lon + 180_f64) / 360_f64) * 2_f64.powi(zoom.into())
 }
 
-fn lat_to_y(lat: &mut f64, zoom: i32) -> f64 {
-    if !(-90f64 <= *lat && *lat <= 90f64) {
-        *lat = (*lat + 90f64) % 180f64 - 90f64;
+fn lat_to_y(lat: f64, zoom: u8) -> f64 {
+    let mut lat = lat;
+
+    if !(-90_f64..90_f64).contains(&lat) {
+        lat = (lat + 90_f64) % 180_f64 - 90_f64;
     }
 
-    (1f64 - ((*lat * PI / 180f64).tan() + 1f64 / (*lat * PI / 180f64).cos()).ln() / PI) / 2f64
-        * 2f64.powi(zoom)
+    (1_f64 - ((lat * PI / 180_f64).tan() + 1_f64 / (lat * PI / 180_f64).cos()).ln() / PI) / 2_f64
+        * 2_f64.powi(zoom.into())
 }
 
-fn _y_to_lat(y: f64, zoom: i32) -> f64 {
-    (PI * (1f64 - 2f64 * y / 2f64.powi(zoom))).sinh().atan() / PI * 180f64
+fn _y_to_lat(y: f64, zoom: u8) -> f64 {
+    (PI * (1f64 - 2f64 * y / 2f64.powi(zoom.into())))
+        .sinh()
+        .atan()
+        / PI
+        * 180f64
 }
 
-fn _x_to_lon(x: f64, zoom: i32) -> f64 {
-    x / 2f64.powi(zoom) * 360f64 - 180f64
+fn _x_to_lon(x: f64, zoom: u8) -> f64 {
+    x / 2f64.powi(zoom.into()) * 360f64 - 180f64
 }
 
 fn simplify(points: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
@@ -283,7 +263,7 @@ fn simplify(points: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
         let a = new_coordinates.last().unwrap();
         let x = ((a.0 - point.0).powi(2) + (a.1 - point.1).powi(2)).sqrt();
 
-        if x > 11f64 {
+        if x > 11_f64 {
             new_coordinates.push(*point)
         }
     }
