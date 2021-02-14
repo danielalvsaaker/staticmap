@@ -1,21 +1,51 @@
-use crate::{lat_to_y, lon_to_x, simplify, tools::Tool, StaticMap};
+use crate::{
+    lat_to_y, lon_to_x, simplify,
+    tools::{Color, Tool},
+    StaticMap,
+};
 use derive_builder::Builder;
-use tiny_skia::{LineCap, Paint, PathBuilder, Pixmap, Stroke, Transform};
+use tiny_skia::{LineCap, PathBuilder, Pixmap, Stroke, Transform};
 
 #[derive(Builder)]
+/// Line object.
+/// Created using LineBuilder.
+///
+/// ## Example
+///
+/// ```rust
+/// use staticmap::LineBuilder;
+///
+///
+/// let line = LineBuilder::default()
+///     .lat_coordinates(vec![52.5, 48.9])
+///     .lon_coordinates(vec![13.4, 2.3])
+///     .build()
+///     .unwrap();
+/// ```
+///
 pub struct Line {
     #[builder(setter(into))]
+    /// Vector or slice of latitude coordinates.
     pub(crate) lat_coordinates: Vec<f64>,
     #[builder(setter(into))]
+    /// Vector or slice of longitude coordinates.
     pub(crate) lon_coordinates: Vec<f64>,
     #[builder(default)]
-    pub(crate) color: Paint<'static>,
+    /// Use [staticmap::Color][crate::Color] to to generate a color instance.
+    pub(crate) color: Color,
     #[builder(default = "1.0")]
+    /// Line width.
     pub(crate) width: f32,
     #[builder(default)]
+    /// Whether to simplify line drawing. Disabled by default.
+    /// Enabling reduces line shakiness by leaving out close points.
     pub(crate) simplify: bool,
+    #[builder(default = "5")]
+    /// Affects line rendering if simplify is enabled. Default is 5.
+    pub(crate) tolerance: u8,
 }
 
+#[doc(hidden)]
 impl Tool for Line {
     fn extent(&self) -> (f64, f64, f64, f64) {
         (
@@ -46,14 +76,14 @@ impl Tool for Line {
             .zip(self.lat_coordinates.iter())
             .map(|(x, y)| {
                 (
-                    map.x_to_px(lon_to_x(*x, map.zoom.unwrap())) * 2f64,
-                    map.y_to_px(lat_to_y(*y, map.zoom.unwrap())) * 2f64,
+                    map.x_to_px(lon_to_x(*x, map.zoom.unwrap())),
+                    map.y_to_px(lat_to_y(*y, map.zoom.unwrap())),
                 )
             })
             .collect();
 
         if self.simplify {
-            points = simplify(points);
+            points = simplify(points, self.tolerance);
         }
 
         for (index, point) in points.iter().enumerate() {
@@ -69,7 +99,7 @@ impl Tool for Line {
 
         pixmap.stroke_path(
             &path,
-            &self.color,
+            &self.color.0,
             &Stroke {
                 width: self.width,
                 line_cap: LineCap::Round,

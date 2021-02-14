@@ -1,10 +1,13 @@
-use staticmap::{Color, LineBuilder, StaticMapBuilder, StaticMapError};
+use staticmap::{
+    tools::{Color, LineBuilder},
+    StaticMapBuilder, StaticMapError,
+};
 
 fn main() -> Result<(), StaticMapError> {
     let mut map = StaticMapBuilder::default()
-        .width(400)
+        .width(300)
         .height(400)
-        .url_template("https://c.tile.openstreetmap.org/%z/%x/%y.png")
+        .padding((10, 0))
         .build()
         .unwrap();
 
@@ -17,7 +20,7 @@ fn main() -> Result<(), StaticMapError> {
     let line = LineBuilder::default()
         .lat_coordinates(lat)
         .lon_coordinates(lon.clone())
-        .width(6.)
+        .width(3.)
         .simplify(true)
         .color(red)
         .build()
@@ -26,7 +29,7 @@ fn main() -> Result<(), StaticMapError> {
     let underline = LineBuilder::default()
         .lat_coordinates(lat)
         .lon_coordinates(lon)
-        .width(15.)
+        .width(5.)
         .simplify(true)
         .color(white)
         .build()
@@ -35,7 +38,7 @@ fn main() -> Result<(), StaticMapError> {
     map.add_line(underline);
     map.add_line(line);
 
-    map.save_png("test3.png")?;
+    map.save_png("line.png")?;
 
     Ok(())
 }
