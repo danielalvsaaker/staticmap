@@ -7,14 +7,12 @@ use derive_builder::Builder;
 use tiny_skia::{LineCap, PathBuilder, Pixmap, Stroke, Transform};
 
 #[derive(Builder)]
-/// Line object.
-/// Created using LineBuilder.
+/// Line tool.
+/// Use [LineBuilder][LineBuilder] as an entrypoint.
 ///
 /// ## Example
-///
 /// ```rust
-/// use staticmap::LineBuilder;
-///
+/// use staticmap::tools::LineBuilder;
 ///
 /// let line = LineBuilder::default()
 ///     .lat_coordinates(vec![52.5, 48.9])
@@ -22,27 +20,37 @@ use tiny_skia::{LineCap, PathBuilder, Pixmap, Stroke, Transform};
 ///     .build()
 ///     .unwrap();
 /// ```
-///
 pub struct Line {
     #[builder(setter(into))]
+    /// **Required**.
     /// Vector or slice of latitude coordinates.
-    pub(crate) lat_coordinates: Vec<f64>,
+    lat_coordinates: Vec<f64>,
+
     #[builder(setter(into))]
+    /// **Required**.
     /// Vector or slice of longitude coordinates.
-    pub(crate) lon_coordinates: Vec<f64>,
+    lon_coordinates: Vec<f64>,
+
     #[builder(default)]
-    /// Use [staticmap::Color][crate::Color] to to generate a color instance.
-    pub(crate) color: Color,
+    /// Use [Color][Color] to to generate a color instance.
+    /// Default is a black color.
+    color: Color,
+
     #[builder(default = "1.0")]
     /// Line width.
-    pub(crate) width: f32,
+    /// Default is 1.0.
+    width: f32,
+
     #[builder(default)]
     /// Whether to simplify line drawing. Disabled by default.
     /// Enabling reduces line shakiness by leaving out close points.
-    pub(crate) simplify: bool,
+    /// Disabled by default.
+    simplify: bool,
+
     #[builder(default = "5")]
-    /// Affects line rendering if simplify is enabled. Default is 5.
-    pub(crate) tolerance: u8,
+    /// Affects line rendering if simplify is enabled.
+    /// Default is 5.
+    tolerance: u8,
 }
 
 #[doc(hidden)]

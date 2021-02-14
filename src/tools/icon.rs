@@ -34,23 +34,47 @@ impl From<&str> for Image {
 }
 
 #[derive(Builder)]
-/// Icon object. Created using IconBuilder.
+/// Icon tool.
+/// Use [IconBuilder][IconBuilder] as an entrypoint.
+///
+/// ## Example
+/// ```rust
+/// use staticmap::tools::IconBuilder;
+///
+/// let icon = IconBuilder::default()
+///     .lat_coordinate(6.5)
+///     .lon_coordinate(50.5)
+///     .x_offset(3.4)
+///     .y_offset(10.)
+///     .image("icon.png")
+///     .build()
+///     .unwrap();
+/// ```
 pub struct Icon {
+    /// **Required**.
     /// Latitude coordinate for center of icon.
-    pub(crate) lat_coordinate: f64,
+    lat_coordinate: f64,
+
+    /// **Required**.
     /// Longitude coordinate for center of icon.
-    pub(crate) lon_coordinate: f64,
+    lon_coordinate: f64,
+
+    /// **Required**.
     /// X position of the tip of the icon in pixels, relative to the left bottom of the map.
-    pub(crate) x_offset: f64,
+    x_offset: f64,
+
+    /// **Required**.
     /// Y position of the tip of the icon in pixels, relative to the left bottom of the map.
-    pub(crate) y_offset: f64,
+    y_offset: f64,
+
     #[builder(setter(into))]
+    /// **Required**.
     /// Takes either a `String`/`&str` to a path containing an icon,
     /// or a `Vec<u8>`/`&[u8]` containing image data.
     ///
     /// The icon **must** be a 8-bit png image.
     /// Panics if the path or data is invalid.
-    pub(crate) image: Image,
+    image: Image,
 }
 
 #[doc(hidden)]

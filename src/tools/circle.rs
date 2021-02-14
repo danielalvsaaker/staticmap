@@ -7,18 +7,38 @@ use derive_builder::Builder;
 use tiny_skia::{FillRule, PathBuilder, Pixmap, Transform};
 
 #[derive(Builder)]
-/// Circle object. Created using CircleBuilder.
+/// Circle tool.
+/// Use [CircleBuilder][CircleBuilder] as an entrypoint.
+///
+/// ## Example
+/// ```rust
+/// use staticmap::tools::CircleBuilder;
+///
+/// let circle = CircleBuilder::default()
+///     .lat_coordinate(4.5)
+///     .lon_coordinate(44.2)
+///     .radius(4.)
+///     .build()
+///     .unwrap();
+/// ```
 pub struct Circle {
+    /// **Required**.
     /// Latitude coordinate for center of circle.
-    pub(crate) lat_coordinate: f64,
+    lat_coordinate: f64,
+
+    /// **Required**.
     /// Longitude coordinate for center of circle.
-    pub(crate) lon_coordinate: f64,
+    lon_coordinate: f64,
+
     #[builder(default)]
-    /// Use [staticmap::Color][crate::Color] to generate a color instance.
-    pub(crate) color: Color,
+    /// Use [Color][Color] to generate a color instance.
+    /// Default is a black color.
+    color: Color,
+
     #[builder(default = "1.0")]
     /// Circle radius in pixels.
-    pub(crate) radius: f32,
+    /// Default is 1.0.
+    radius: f32,
 }
 
 #[doc(hidden)]

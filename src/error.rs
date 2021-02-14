@@ -1,10 +1,13 @@
 #[derive(Debug)]
 pub enum StaticMapError {
+    /// Error when encoding image to png.
     PngEncodingError(png::EncodingError),
+    /// Either invalid url or request failure.
     TileError {
         error: png::DecodingError,
         url: String,
     },
+    /// Invalid image size.
     InvalidSize,
 }
 

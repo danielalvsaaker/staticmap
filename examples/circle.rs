@@ -7,7 +7,7 @@ fn main() -> Result<(), StaticMapError> {
     let mut map = StaticMapBuilder::default()
         .width(200)
         .height(200)
-        .url_template("http://a.tile.osm.org/{z}/{x}/{y}.png")
+        .url_template("https://a.tile.osm.org/{z}/{x}/{y}.png")
         .zoom(5)
         .build()
         .unwrap();

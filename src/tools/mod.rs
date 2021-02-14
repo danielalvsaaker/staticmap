@@ -9,8 +9,7 @@ pub use icon::{Icon, IconBuilder};
 pub use line::{Line, LineBuilder};
 
 #[derive(Clone, Default)]
-/// Wrapper for tiny_skia::Paint.
-///
+/// Path color.
 ///
 /// ## Example
 ///
@@ -32,6 +31,7 @@ impl Color {
     }
 }
 
+#[doc(hidden)]
 /// Generic trait implemented by types which can be drawn to a map.
 pub trait Tool {
     /// Coordinates forming the extent of the object.

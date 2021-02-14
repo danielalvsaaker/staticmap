@@ -14,8 +14,8 @@ keywords = ["openstreetmap", "osm", "map"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rayon = "1.5"
 attohttpc = { version = "0.16", default-features = false, features = ["tls-rustls"] }
-tiny-skia = { git = "https://github.com/RazrFalcon/tiny-skia" }
 derive_builder = "0.9"
 png = { version = "0.16", default-features = false }
+rayon = "1.5"
+tiny-skia = { git = "https://github.com/RazrFalcon/tiny-skia" }
