@@ -95,7 +95,7 @@ fn x_to_lon(x: f64, zoom: u8) -> f64 {
 }
 
 fn simplify(points: Vec<(f64, f64)>, tolerance: u8) -> Vec<(f64, f64)> {
-    if points.is_empty() {
+    if points.len() < 2 {
         return points;
     }
 

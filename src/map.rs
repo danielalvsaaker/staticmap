@@ -8,6 +8,7 @@ use rayon::prelude::*;
 use tiny_skia::{Pixmap, PixmapPaint, Transform};
 
 #[derive(Builder)]
+#[builder(build_fn(validate = "Self::validate"))]
 /// Main type.
 /// Use [StaticMapBuilder][StaticMapBuilder] as an entrypoint.
 ///
@@ -42,7 +43,7 @@ pub struct StaticMap {
 
     #[builder(setter(strip_option), default)]
     /// Map zoom, usually between 1-17.
-    /// Default is calculated based on features.
+    /// Default is calculated based on features if not specified.
     pub(crate) zoom: Option<u8>,
 
     #[builder(default, setter(strip_option))]
@@ -84,6 +85,21 @@ pub struct StaticMap {
 impl StaticMapBuilder {
     fn default_url_template() -> String {
         "https://a.tile.osm.org/{z}/{x}/{y}.png".to_string()
+    }
+
+    fn validate(&self) -> std::result::Result<(), String> {
+        if let Some(width) = self.width {
+            if width == 0 {
+                return Err("Width can not be zero.".into());
+            }
+        }
+        else if let Some(height) = self.height {
+            if height == 0 {
+                return Err("Height can not be zero.".into());
+            }
+        }
+        
+        Ok(())
     }
 }
 
