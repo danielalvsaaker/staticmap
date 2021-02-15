@@ -3,15 +3,13 @@ name = "staticmap"
 version = "0.3.0"
 authors = ["danielalvsaaker <daniel@nopemail.net>"]
 edition = "2018"
-description = "Static map generator"
+description = "Tile based static map image renderer."
+documentation = "https://docs.rs/staticmap"
 repository = "https://github.com/danielalvsaaker/staticmap"
 readme = "README.md"
 license = "MIT"
 categories = ["multimedia::images"]
 keywords = ["openstreetmap", "osm", "map"]
-
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 attohttpc = { version = "0.16", default-features = false, features = ["tls-rustls"] }
