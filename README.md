@@ -1,5 +1,5 @@
-![docs](https://img.shields.io/docsrs/staticmap/latest)
-![crate](https://img.shields.io/crates/v/staticmap)
+[![docs](https://img.shields.io/docsrs/staticmap/latest)](https://docs.rs/staticmap)
+[![crate](https://img.shields.io/crates/v/staticmap)](https://crates.io/crates/staticmap)
 
 # StaticMap
 StaticMap is a library for rendering images of tile based maps.
