@@ -1,20 +1,19 @@
 [package]
 name = "staticmap"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["danielalvsaaker <daniel@nopemail.net>"]
 edition = "2018"
-description = "Static map generator"
+description = "Tile based static map image renderer."
+documentation = "https://docs.rs/staticmap"
 repository = "https://github.com/danielalvsaaker/staticmap"
 readme = "README.md"
 license = "MIT"
 categories = ["multimedia::images"]
 keywords = ["openstreetmap", "osm", "map"]
 
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-image = { version = "0.23.10", default-features = false, features = ["png"] }
-rayon = "1.1"
-attohttpc = { version = "0.15", default-features = false, features = ["tls-rustls"] }
-raqote = { version = "0.8.0", default-features = false }
+attohttpc = { version = "0.16", default-features = false, features = ["tls-rustls"] }
+derive_builder = "0.9"
+png = { version = "0.16", default-features = false }
+rayon = "1.5"
+tiny-skia = "0.5"
