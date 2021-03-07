@@ -102,7 +102,6 @@ impl Tool for Line {
             }
         }
 
-        path_builder.close();
         let path = path_builder.finish().unwrap();
 
         pixmap.stroke_path(
