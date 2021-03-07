@@ -83,15 +83,15 @@ fn lat_to_y(lat: f64, zoom: u8) -> f64 {
 }
 
 fn y_to_lat(y: f64, zoom: u8) -> f64 {
-    (PI * (1f64 - 2f64 * y / 2f64.powi(zoom.into())))
+    (PI * (1_f64 - 2_f64 * y / 2_f64.powi(zoom.into())))
         .sinh()
         .atan()
         / PI
-        * 180f64
+        * 180_f64
 }
 
 fn x_to_lon(x: f64, zoom: u8) -> f64 {
-    x / 2f64.powi(zoom.into()) * 360f64 - 180f64
+    x / 2_f64.powi(zoom.into()) * 360_f64 - 180_f64
 }
 
 fn simplify(points: Vec<(f64, f64)>, tolerance: u8) -> Vec<(f64, f64)> {

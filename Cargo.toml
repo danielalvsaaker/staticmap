@@ -16,4 +16,4 @@ attohttpc = { version = "0.16", default-features = false, features = ["tls-rustl
 derive_builder = "0.9"
 png = { version = "0.16", default-features = false }
 rayon = "1.5"
-tiny-skia = { git = "https://github.com/RazrFalcon/tiny-skia" }
+tiny-skia = "0.5"
