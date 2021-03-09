@@ -61,9 +61,7 @@ use std::f64::consts::PI;
 
 type Result<T> = std::result::Result<T, StaticMapError>;
 
-fn lon_to_x(lon: f64, zoom: u8) -> f64 {
-    let mut lon = lon;
-
+fn lon_to_x(mut lon: f64, zoom: u8) -> f64 {
     if !(-180_f64..180_f64).contains(&lon) {
         lon = (lon + 180_f64) % 360_f64 - 180_f64;
     }
@@ -71,9 +69,7 @@ fn lon_to_x(lon: f64, zoom: u8) -> f64 {
     ((lon + 180_f64) / 360_f64) * 2_f64.powi(zoom.into())
 }
 
-fn lat_to_y(lat: f64, zoom: u8) -> f64 {
-    let mut lat = lat;
-
+fn lat_to_y(mut lat: f64, zoom: u8) -> f64 {
     if !(-90_f64..90_f64).contains(&lat) {
         lat = (lat + 90_f64) % 180_f64 - 90_f64;
     }
