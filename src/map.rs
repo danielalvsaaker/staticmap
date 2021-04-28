@@ -88,14 +88,9 @@ impl StaticMapBuilder {
     }
 
     fn validate(&self) -> std::result::Result<(), String> {
-        if let Some(width) = self.width {
-            if width == 0 {
-                return Err("Width can not be zero.".into());
-            }
-        }
-        else if let Some(height) = self.height {
-            if height == 0 {
-                return Err("Height can not be zero.".into());
+        if let Some((width, height)) = self.width.zip(self.height) {
+            if width == 0 || height == 0 {
+                return Err("Width or height can not be zero.".into());
             }
         }
         

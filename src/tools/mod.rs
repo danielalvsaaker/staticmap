@@ -14,7 +14,7 @@ pub use line::{Line, LineBuilder};
 /// ## Example
 ///
 /// ```rust
-/// use staticmap::Color;
+/// use staticmap::tools::Color;
 ///
 /// let solid_red = Color::new(true, 255, 0, 0, 255);
 /// let semitransparent_blue = Color::new(true, 0, 255, 0, 125);

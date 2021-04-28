@@ -39,7 +39,8 @@
 //!         .width(3.)
 //!         .simplify(true)
 //!         .color(red)
-//!         .build();
+//!         .build()
+//!         .unwrap();
 //!
 //!     map.add_line(line);
 //!     map.save_png("line.png")?;

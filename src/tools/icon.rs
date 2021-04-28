@@ -9,27 +9,43 @@ use tiny_skia::{Pixmap, PixmapPaint, Transform};
 #[derive(Clone)]
 pub struct Image(Pixmap);
 
+impl Image {
+    fn from_bytes(b: &[u8]) -> Self {
+        Self(Pixmap::decode_png(b).expect("Invalid png data."))
+    }
+
+    fn from_path<P: AsRef<std::path::Path>>(p: P) -> Self {
+        Self(Pixmap::load_png(p).expect("Invalid path or file format."))
+    }
+}
+
 impl From<Vec<u8>> for Image {
-    fn from(v: Vec<u8>) -> Image {
-        Image(Pixmap::decode_png(&v).expect("Invalid png data."))
+    fn from(b: Vec<u8>) -> Image {
+        Self::from_bytes(&b)
     }
 }
 
 impl From<&[u8]> for Image {
-    fn from(v: &[u8]) -> Image {
-        Image(Pixmap::decode_png(v).expect("Invalid png data."))
+    fn from(b: &[u8]) -> Image {
+        Self::from_bytes(b)
     }
 }
 
 impl From<String> for Image {
-    fn from(v: String) -> Image {
-        Image(Pixmap::load_png(v).expect("Invalid path or file format."))
+    fn from(s: String) -> Image {
+        Self::from_path(s)
     }
 }
 
 impl From<&str> for Image {
-    fn from(v: &str) -> Image {
-        Image(Pixmap::load_png(v).expect("Invalid path or file format."))
+    fn from(s: &str) -> Image {
+        Self::from_path(s)
+    }
+}
+
+impl From<&std::path::Path> for Image {
+    fn from(p: &std::path::Path) -> Image {
+        Self::from_path(p)
     }
 }
 
