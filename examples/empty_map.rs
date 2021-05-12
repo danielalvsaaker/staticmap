@@ -1,14 +1,13 @@
-use staticmap::{StaticMapBuilder, StaticMapError};
+use staticmap::{Error, StaticMapBuilder};
 
-fn main() -> Result<(), StaticMapError> {
-    let mut map = StaticMapBuilder::default()
+fn main() -> Result<(), Error> {
+    let mut map = StaticMapBuilder::new()
         .width(300)
         .height(300)
         .zoom(4)
         .lon_center(4.)
         .lat_center(54.)
-        .build()
-        .unwrap();
+        .build()?;
 
     map.save_png("empty_map.png")?;
 

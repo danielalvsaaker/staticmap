@@ -1,15 +1,13 @@
 use crate::{
+    bounds::Bounds,
     lat_to_y, lon_to_x, simplify,
     tools::{Color, Tool},
-    StaticMap,
+    Error, Result,
 };
-use derive_builder::Builder;
-use tiny_skia::{LineCap, PathBuilder, Pixmap, Stroke, Transform};
+use tiny_skia::{LineCap, PathBuilder, PixmapMut, Stroke, Transform};
 
-#[derive(Builder)]
 /// Line tool.
 /// Use [LineBuilder][LineBuilder] as an entrypoint.
-///
 /// ## Example
 /// ```rust
 /// use staticmap::tools::LineBuilder;
@@ -21,41 +19,115 @@ use tiny_skia::{LineCap, PathBuilder, Pixmap, Stroke, Transform};
 ///     .unwrap();
 /// ```
 pub struct Line {
-    #[builder(setter(into))]
-    /// **Required**.
-    /// Vector or slice of latitude coordinates.
     lat_coordinates: Vec<f64>,
-
-    #[builder(setter(into))]
-    /// **Required**.
-    /// Vector or slice of longitude coordinates.
     lon_coordinates: Vec<f64>,
-
-    #[builder(default)]
-    /// Use [Color][Color] to to generate a color instance.
-    /// Default is a black color.
     color: Color,
-
-    #[builder(default = "1.0")]
-    /// Line width.
-    /// Default is 1.0.
     width: f32,
-
-    #[builder(default)]
-    /// Whether to simplify line drawing. Disabled by default.
-    /// Enabling reduces line shakiness by leaving out close points.
-    /// Disabled by default.
     simplify: bool,
-
-    #[builder(default = "5")]
-    /// Affects line rendering if simplify is enabled.
-    /// Default is 5.
-    tolerance: u8,
+    tolerance: f64,
 }
 
-#[doc(hidden)]
+pub struct LineBuilder {
+    lat_coordinates: Option<Vec<f64>>,
+    lon_coordinates: Option<Vec<f64>>,
+    color: Color,
+    width: f32,
+    simplify: bool,
+    tolerance: f64,
+}
+
+impl Default for LineBuilder {
+    fn default() -> Self {
+        Self {
+            lat_coordinates: None,
+            lon_coordinates: None,
+            color: Color::default(),
+            width: 1.,
+            simplify: false,
+            tolerance: 5.,
+        }
+    }
+}
+
+impl LineBuilder {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// **Required**.
+    /// Takes a collection of latitude coordinates.
+    pub fn lat_coordinates<I>(mut self, coordinates: I) -> Self
+    where
+        I: IntoIterator<Item = f64>,
+    {
+        let coordinates = coordinates.into_iter().collect();
+        self.lat_coordinates = Some(coordinates);
+        self
+    }
+
+    /// **Required**.
+    /// Takes a collection of longitude coordinates.
+    pub fn lon_coordinates<I>(mut self, coordinates: I) -> Self
+    where
+        I: IntoIterator<Item = f64>,
+    {
+        let coordinates = coordinates.into_iter().collect();
+        self.lon_coordinates = Some(coordinates);
+        self
+    }
+
+    /// Use [Color][Color] to to generate a color instance.
+    /// Default is a black color.
+    pub fn color(mut self, color: Color) -> Self {
+        self.color = color;
+        self
+    }
+
+    /// Line width.
+    /// Default is 1.0.
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = width;
+        self
+    }
+
+    /// Whether to simplify line drawing.
+    /// Enabling reduces line shakiness by leaving out close points.
+    /// Disabled by default.
+    pub fn simplify(mut self, simplify: bool) -> Self {
+        self.simplify = simplify;
+        self
+    }
+
+    /// Affects line rendering if simplify is enabled.
+    ///
+    ///
+    /// Represents the minimum distance in pixels between two points.
+    /// Default is 5.0.
+    pub fn tolerance(mut self, tolerance: f64) -> Self {
+        self.tolerance = tolerance;
+        self
+    }
+
+    /// Build the tool, consuming the builder.
+    /// Returns an error if the builder is missing required fields.
+    pub fn build(self) -> Result<Line> {
+        Ok(Line {
+            lat_coordinates: self
+                .lat_coordinates
+                .ok_or(Error::BuildError("Latitude coordinates not supplied."))?,
+            lon_coordinates: self
+                .lon_coordinates
+                .ok_or(Error::BuildError("Longitude coordinates not supplied."))?,
+            color: self.color,
+            width: self.width,
+            simplify: self.simplify,
+            tolerance: self.tolerance,
+        })
+    }
+}
+
 impl Tool for Line {
-    fn extent(&self) -> (f64, f64, f64, f64) {
+    fn extent(&self, _: u8, _: f64) -> (f64, f64, f64, f64) {
         (
             self.lon_coordinates
                 .iter()
@@ -76,7 +148,7 @@ impl Tool for Line {
         )
     }
 
-    fn draw(&self, map: &StaticMap, pixmap: &mut Pixmap) {
+    fn draw(&self, bounds: &Bounds, mut pixmap: PixmapMut) {
         let mut path_builder = PathBuilder::new();
         let mut points: Vec<(f64, f64)> = self
             .lon_coordinates
@@ -84,8 +156,8 @@ impl Tool for Line {
             .zip(self.lat_coordinates.iter())
             .map(|(x, y)| {
                 (
-                    map.x_to_px(lon_to_x(*x, map.zoom.unwrap())),
-                    map.y_to_px(lat_to_y(*y, map.zoom.unwrap())),
+                    bounds.x_to_px(lon_to_x(*x, bounds.zoom)),
+                    bounds.y_to_px(lat_to_y(*y, bounds.zoom)),
                 )
             })
             .collect();

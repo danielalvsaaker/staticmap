@@ -1,14 +1,12 @@
 use crate::{
-    lat_to_y, lon_to_x,
-    tools::{Line, Marker, Tool},
-    x_to_lon, y_to_lat, Result, StaticMapError,
+    bounds::{Bounds, BoundsBuilder},
+    tools::Tool,
+    Error, Result,
 };
-use derive_builder::Builder;
+use attohttpc::{Method, RequestBuilder};
 use rayon::prelude::*;
-use tiny_skia::{Pixmap, PixmapPaint, Transform};
+use tiny_skia::{Pixmap, PixmapMut, PixmapPaint, Transform};
 
-#[derive(Builder)]
-#[builder(build_fn(validate = "Self::validate"))]
 /// Main type.
 /// Use [StaticMapBuilder][StaticMapBuilder] as an entrypoint.
 ///
@@ -16,7 +14,7 @@ use tiny_skia::{Pixmap, PixmapPaint, Transform};
 /// ```rust
 /// use staticmap::StaticMapBuilder;
 ///
-/// let mut map = StaticMapBuilder::default()
+/// let mut map = StaticMapBuilder::new()
 ///     .width(300)
 ///     .height(300)
 ///     .zoom(4)
@@ -24,222 +22,182 @@ use tiny_skia::{Pixmap, PixmapPaint, Transform};
 ///     .lon_center(13.4)
 ///     .build()
 ///     .unwrap();
+///
 /// ```
 pub struct StaticMap {
-    #[builder(default = "300")]
-    /// Image width in pixels.
-    /// Default is 300.
-    width: u32,
-
-    #[builder(default = "300")]
-    /// Image height in pixels.
-    /// Default is 300.
-    height: u32,
-
-    #[builder(default)]
-    /// Minimal distance between map features and map border in pixels. Given as a tuple of (x, y).
-    /// Default is (0, 0).
-    padding: (u32, u32),
-
-    #[builder(setter(strip_option), default)]
-    /// Map zoom, usually between 1-17.
-    /// Default is calculated based on features if not specified.
-    pub(crate) zoom: Option<u8>,
-
-    #[builder(default, setter(strip_option))]
-    /// Latitude center of map.
-    /// Default is calculated based on features if not specified.
-    lat_center: Option<f64>,
-
-    #[builder(default, setter(strip_option))]
-    /// Longitude center of map.
-    /// Default is calculated based on features if not specified.
-    lon_center: Option<f64>,
-
-    #[builder(default = "Self::default_url_template()", setter(into))]
-    /// URL template. e.g. "https://a.tile.osm.org/{z}/{x}/{y}.png".
-    /// Default is used if not specified.
     url_template: String,
+    tools: Vec<Box<dyn Tool>>,
+    bounds: BoundsBuilder,
+}
 
-    #[builder(default = "256")]
-    ///Tile size.
-    ///Default is 256.
+pub struct StaticMapBuilder {
+    width: u32,
+    height: u32,
+    padding: (u32, u32),
+    zoom: Option<u8>,
+    lat_center: Option<f64>,
+    lon_center: Option<f64>,
+    url_template: String,
     tile_size: u32,
+}
 
-    #[builder(setter(skip))]
-    x_center: f64,
-
-    #[builder(setter(skip))]
-    y_center: f64,
-
-    #[builder(setter(skip))]
-    lines: Vec<Line>,
-
-    #[builder(setter(skip))]
-    markers: Vec<Box<dyn Marker>>,
-
-    #[builder(setter(skip))]
-    extent: (f64, f64, f64, f64),
+impl Default for StaticMapBuilder {
+    fn default() -> Self {
+        Self {
+            width: 300,
+            height: 300,
+            padding: (0, 0),
+            zoom: None,
+            lat_center: None,
+            lon_center: None,
+            url_template: "https://a.tile.osm.org/{z}/{x}/{y}.png".to_string(),
+            tile_size: 256,
+        }
+    }
 }
 
 impl StaticMapBuilder {
-    fn default_url_template() -> String {
-        "https://a.tile.osm.org/{z}/{x}/{y}.png".to_string()
+    /// Create a new builder with defaults.
+    pub fn new() -> Self {
+        Default::default()
     }
 
-    fn validate(&self) -> std::result::Result<(), String> {
-        if let Some((width, height)) = self.width.zip(self.height) {
-            if width == 0 || height == 0 {
-                return Err("Width or height can not be zero.".into());
-            }
-        }
-        
-        Ok(())
+    /// Image width, in pixels.
+    /// Default is 300.
+    pub fn width(mut self, width: u32) -> Self {
+        self.width = width;
+        self
+    }
+
+    /// Image height, in pixels.
+    /// Default is 300.
+    pub fn height(mut self, height: u32) -> Self {
+        self.height = height;
+        self
+    }
+
+    /// Padding between map features and edge of map in x and y direction.
+    /// Default is (0, 0).
+    pub fn padding(mut self, padding: (u32, u32)) -> Self {
+        self.padding = padding;
+        self
+    }
+
+    /// Map zoom, usually between 1-17.
+    /// Determined based on map features if not specified.
+    pub fn zoom(mut self, zoom: u8) -> Self {
+        self.zoom = Some(zoom);
+        self
+    }
+
+    /// Latitude center of the map.
+    /// Determined based on map features if not specified.
+    pub fn lat_center(mut self, coordinate: f64) -> Self {
+        self.lat_center = Some(coordinate);
+        self
+    }
+
+    /// Longitude center of the map.
+    /// Determined based on map features if not specified.
+    pub fn lon_center(mut self, coordinate: f64) -> Self {
+        self.lon_center = Some(coordinate);
+        self
+    }
+
+    /// URL template, e.g. "https://example.com/{z}/{x}/{y}.png".
+    /// Default is "https://a.tile.osm.org/{z}/{x}/{y}.png".
+    pub fn url_template<I: Into<String>>(mut self, url_template: I) -> Self {
+        self.url_template = url_template.into();
+        self
+    }
+
+    /// Tile size, in pixels.
+    /// Default is 256.
+    pub fn tile_size(mut self, tile_size: u32) -> Self {
+        self.tile_size = tile_size;
+        self
+    }
+
+    /// Consumes the builder.
+    pub fn build(self) -> Result<StaticMap> {
+        let bounds = BoundsBuilder::new()
+            .zoom(self.zoom)
+            .tile_size(self.tile_size)
+            .lon_center(self.lon_center)
+            .lat_center(self.lat_center)
+            .padding(self.padding)
+            .height(self.height)
+            .width(self.width);
+
+        Ok(StaticMap {
+            url_template: self.url_template,
+            tools: Vec::new(),
+            bounds,
+        })
     }
 }
 
 impl StaticMap {
-    /// Add a [Line][Line] instance. The map can contain several lines.
-    pub fn add_line(&mut self, line: Line) {
-        self.lines.push(line);
-    }
-
-    /// Add a type implementing [Marker][Marker]. The map can contain several markers.
-    pub fn add_marker(&mut self, marker: impl Marker + 'static) {
-        self.markers.push(Box::new(marker));
+    /// Add a type implementing [Tool][Tool]. The map can contain several tools.
+    pub fn add_tool(&mut self, tool: impl Tool + 'static) {
+        self.tools.push(Box::new(tool));
     }
 
     /// Render the map and encode as png.
     ///
     /// May panic if any feature has invalid bounds.
     pub fn encode_png(&mut self) -> Result<Vec<u8>> {
-        self.render()?
-            .encode_png()
-            .map_err(StaticMapError::PngEncodingError)
+        Ok(self.render()?.encode_png()?)
     }
 
     /// Render the map and save as png to a file.
     ///
     /// May panic if any feature has invalid bounds.
     pub fn save_png<P: AsRef<::std::path::Path>>(&mut self, path: P) -> Result<()> {
-        self.render()?
-            .save_png(path)
-            .map_err(StaticMapError::PngEncodingError)
+        self.render()?.save_png(path)?;
+        Ok(())
     }
 
     fn render(&mut self) -> Result<Pixmap> {
-        if self.zoom.is_none() {
-            self.zoom = Some(self.calculate_zoom());
-        }
+        let bounds = self.bounds.build(&self.tools);
 
-        let (lon_center, lat_center) =
-            if let (Some(x), Some(y)) = (self.lon_center, self.lat_center) {
-                (x, y)
-            } else {
-                self.extent = self.determine_extent(self.zoom.unwrap());
+        let mut image = Pixmap::new(bounds.width, bounds.height).ok_or(Error::InvalidSize)?;
 
-                (
-                    (self.extent.0 + self.extent.2) / 2.0,
-                    (self.extent.1 + self.extent.3) / 2.0,
-                )
-            };
+        self.draw_base_layer(image.as_mut(), &bounds)?;
 
-        self.x_center = lon_to_x(lon_center, self.zoom.unwrap());
-        self.y_center = lat_to_y(lat_center, self.zoom.unwrap());
-
-        let mut image = Pixmap::new(self.width, self.height).ok_or(StaticMapError::InvalidSize)?;
-
-        self.draw_base_layer(&mut image)?;
-
-        if !self.markers.is_empty() || !self.lines.is_empty() {
-            image.draw_pixmap(
-                0,
-                0,
-                self.draw_features()?.as_ref(),
-                &PixmapPaint::default(),
-                Transform::default(),
-                None,
-            );
+        if !self.tools.is_empty() {
+            for tool in self.tools.iter() {
+                tool.draw(&bounds, image.as_mut());
+            }
         }
 
         Ok(image)
     }
 
-    fn determine_extent(&self, zoom: u8) -> (f64, f64, f64, f64) {
-        let lines = self.lines.iter().map(Tool::extent);
-
-        let markers = self
-            .markers
-            .iter()
-            .map(|m| {
-                (
-                    lon_to_x(m.lon_coordinate(), zoom),
-                    lat_to_y(m.lat_coordinate(), zoom),
-                    m.extent(),
-                )
-            })
-            .map(|(x, y, e)| {
-                (
-                    x_to_lon(x - e.0 / self.tile_size as f64, zoom),
-                    y_to_lat(y + e.1 / self.tile_size as f64, zoom),
-                    x_to_lon(x + e.2 / self.tile_size as f64, zoom),
-                    y_to_lat(y - e.3 / self.tile_size as f64, zoom),
-                )
-            });
-
-        let extent: Vec<(f64, f64, f64, f64)> = lines.chain(markers).collect();
-
-        let lon_min: f64 = extent.iter().map(|x| x.0).fold(f64::NAN, f64::min);
-        let lat_min: f64 = extent.iter().map(|x| x.1).fold(f64::NAN, f64::min);
-        let lon_max: f64 = extent.iter().map(|x| x.2).fold(f64::NAN, f64::max);
-        let lat_max: f64 = extent.iter().map(|x| x.3).fold(f64::NAN, f64::max);
-
-        (lon_min, lat_min, lon_max, lat_max)
-    }
-
-    fn calculate_zoom(&self) -> u8 {
-        let mut zoom: u8 = 1;
-
-        let height = |i, (_, x, _, y)| (lat_to_y(x, i) - lat_to_y(y, i)) * self.tile_size as f64;
-        let width = |i, (x, _, y, _)| (lon_to_x(y, i) - lon_to_x(x, i)) * self.tile_size as f64;
-
-        for z in (0..=17).rev() {
-            let extent = self.determine_extent(z);
-
-            if width(z, extent) > (self.width - self.padding.0 * 2) as f64 {
-                continue;
-            }
-
-            if height(z, extent) > (self.height - self.padding.1 * 2) as f64 {
-                continue;
-            }
-
-            zoom = z;
-            break;
-        }
-        zoom
-    }
-
-    fn draw_base_layer(&self, image: &mut Pixmap) -> Result<()> {
-        let x_min =
-            (self.x_center - (0.5 * self.width as f64 / self.tile_size as f64)).floor() as i32;
-        let y_min =
-            (self.y_center - (0.5 * self.height as f64 / self.tile_size as f64)).floor() as i32;
-        let x_max =
-            (self.x_center + (0.5 * self.width as f64 / self.tile_size as f64)).ceil() as i32;
-        let y_max =
-            (self.y_center + (0.5 * self.height as f64 / self.tile_size as f64)).ceil() as i32;
+    fn draw_base_layer(&self, mut image: PixmapMut, bounds: &Bounds) -> Result<()> {
+        let x_min = (bounds.x_center
+            - (0.5 * f64::from(bounds.width) / f64::from(bounds.tile_size)))
+        .floor() as i32;
+        let y_min = (bounds.y_center
+            - (0.5 * f64::from(bounds.height) / f64::from(bounds.tile_size)))
+        .floor() as i32;
+        let x_max = (bounds.x_center
+            + (0.5 * f64::from(bounds.width) / f64::from(bounds.tile_size)))
+        .ceil() as i32;
+        let y_max = (bounds.y_center
+            + (0.5 * f64::from(bounds.height) / f64::from(bounds.tile_size)))
+        .ceil() as i32;
 
         let mut tiles: Vec<(i32, i32, String)> = Vec::new();
         for x in x_min..x_max {
             for y in y_min..y_max {
-                let max_tile: i32 = 2i32.pow(self.zoom.unwrap() as u32);
-                let tile_x: i32 = (x + max_tile) % max_tile;
-                let tile_y: i32 = (y + max_tile) % max_tile;
+                let max_tile: i32 = 2_i32.pow(bounds.zoom.into());
+                let tile_x = (x + max_tile) % max_tile;
+                let tile_y = (y + max_tile) % max_tile;
 
                 let url = self
                     .url_template
-                    .replace("{z}", &self.zoom.unwrap().to_string())
+                    .replace("{z}", &bounds.zoom.to_string())
                     .replace("{x}", &tile_x.to_string())
                     .replace("{y}", &tile_y.to_string());
 
@@ -247,27 +205,24 @@ impl StaticMap {
             }
         }
 
-        let client = attohttpc::Session::new();
-        let tile_images: Vec<Vec<u8>> = tiles
+        let tile_images: Vec<_> = tiles
             .par_iter()
-            .flat_map(|x| {
-                client
-                    .get(&x.2)
-                    .send()
-                    .expect("Failed to send tile request")
-                    .bytes()
+            .map(|x| {
+                RequestBuilder::try_new(Method::GET, &x.2)
+                    .and_then(RequestBuilder::send)
+                    .and_then(attohttpc::Response::bytes)
+                    .map_err(|error| Error::TileError {
+                        error,
+                        url: x.2.clone(),
+                    })
             })
             .collect();
 
         for (tile, tile_image) in tiles.iter().zip(tile_images) {
             let (x, y) = (tile.0, tile.1);
-            let (x_px, y_px) = (self.x_to_px(x.into()), self.y_to_px(y.into()));
+            let (x_px, y_px) = (bounds.x_to_px(x.into()), bounds.y_to_px(y.into()));
 
-            let pixmap =
-                Pixmap::decode_png(&tile_image).map_err(|e| StaticMapError::TileError {
-                    error: e,
-                    url: tile.2.clone(),
-                })?;
+            let pixmap = Pixmap::decode_png(&tile_image?)?;
 
             image.draw_pixmap(
                 x_px as i32,
@@ -280,29 +235,5 @@ impl StaticMap {
         }
 
         Ok(())
-    }
-
-    fn draw_features(&self) -> Result<Pixmap> {
-        let mut pixmap = Pixmap::new(self.width, self.height).ok_or(StaticMapError::InvalidSize)?;
-
-        for line in self.lines.iter() {
-            line.draw(self, &mut pixmap);
-        }
-
-        for marker in self.markers.iter() {
-            marker.draw(self, &mut pixmap);
-        }
-
-        Ok(pixmap)
-    }
-
-    pub(crate) fn x_to_px(&self, x: f64) -> f64 {
-        let px = (x - self.x_center) * self.tile_size as f64 + self.width as f64 / 2f64;
-        px.round()
-    }
-
-    pub(crate) fn y_to_px(&self, y: f64) -> f64 {
-        let px = (y - self.y_center) * self.tile_size as f64 + self.height as f64 / 2f64;
-        px.round()
     }
 }

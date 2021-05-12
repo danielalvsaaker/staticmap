@@ -16,53 +16,53 @@
 //! ```rust
 //! use staticmap::{
 //!     tools::{Color, LineBuilder},
-//!     StaticMapBuilder, StaticMapError,
+//!     StaticMapBuilder, Error,
 //! };
 //!
-//! fn main() -> Result<(), StaticMapError> {
+//! fn main() -> Result<(), Error> {
 //!     let mut map = StaticMapBuilder::default()
 //!         .width(300)
 //!         .height(400)
 //!         .padding((10, 0))
-//!         .build()
-//!         .unwrap();
+//!         .build()?;
 //!
-//!     // Coordinates can be either vec or slice
 //!     let lat: &[f64] = &[52.5, 48.9];
 //!     let lon: Vec<f64> = vec![13.4, 2.3];
 //!
 //!     let red = Color::new(true, 255, 0, 0, 255);
 //!
 //!     let line = LineBuilder::default()
-//!         .lat_coordinates(lat)
+//!         .lat_coordinates(lat.to_vec())
 //!         .lon_coordinates(lon)
 //!         .width(3.)
 //!         .simplify(true)
 //!         .color(red)
-//!         .build()
-//!         .unwrap();
+//!         .build()?;
 //!
-//!     map.add_line(line);
+//!     map.add_tool(line);
 //!     map.save_png("line.png")?;
 //!
 //!     Ok(())
 //! }
 //! ```
 
+mod bounds;
 mod error;
 mod map;
 
-/// Line and marker tools.
+/// Tools for drawing features on to the map.
 pub mod tools;
 
-pub use error::StaticMapError;
+pub use bounds::Bounds;
+pub use error::Error;
 pub use map::{StaticMap, StaticMapBuilder};
 
 use std::f64::consts::PI;
 
-type Result<T> = std::result::Result<T, StaticMapError>;
+type Result<T> = std::result::Result<T, Error>;
 
-fn lon_to_x(mut lon: f64, zoom: u8) -> f64 {
+/// Longitude to x coordinate.
+pub fn lon_to_x(mut lon: f64, zoom: u8) -> f64 {
     if !(-180_f64..180_f64).contains(&lon) {
         lon = (lon + 180_f64) % 360_f64 - 180_f64;
     }
@@ -70,7 +70,8 @@ fn lon_to_x(mut lon: f64, zoom: u8) -> f64 {
     ((lon + 180_f64) / 360_f64) * 2_f64.powi(zoom.into())
 }
 
-fn lat_to_y(mut lat: f64, zoom: u8) -> f64 {
+/// Latitude to y coordinate.
+pub fn lat_to_y(mut lat: f64, zoom: u8) -> f64 {
     if !(-90_f64..90_f64).contains(&lat) {
         lat = (lat + 90_f64) % 180_f64 - 90_f64;
     }
@@ -79,7 +80,13 @@ fn lat_to_y(mut lat: f64, zoom: u8) -> f64 {
         * 2_f64.powi(zoom.into())
 }
 
-fn y_to_lat(y: f64, zoom: u8) -> f64 {
+/// X to longitude coordinate.
+pub fn x_to_lon(x: f64, zoom: u8) -> f64 {
+    x / 2_f64.powi(zoom.into()) * 360_f64 - 180_f64
+}
+
+/// Y to latitude coordinate.
+pub fn y_to_lat(y: f64, zoom: u8) -> f64 {
     (PI * (1_f64 - 2_f64 * y / 2_f64.powi(zoom.into())))
         .sinh()
         .atan()
@@ -87,28 +94,24 @@ fn y_to_lat(y: f64, zoom: u8) -> f64 {
         * 180_f64
 }
 
-fn x_to_lon(x: f64, zoom: u8) -> f64 {
-    x / 2_f64.powi(zoom.into()) * 360_f64 - 180_f64
-}
-
-fn simplify(points: Vec<(f64, f64)>, tolerance: u8) -> Vec<(f64, f64)> {
+fn simplify(points: Vec<(f64, f64)>, tolerance: f64) -> Vec<(f64, f64)> {
     if points.len() < 2 {
         return points;
     }
 
-    let (new_coordinates, points) = points.split_at(1);
-    let mut new_coordinates = new_coordinates.to_vec();
+    let (simplified_points, points) = points.split_at(1);
+    let mut simplified_points = simplified_points.to_vec();
 
     for point in points {
-        let a = new_coordinates.last().unwrap();
-        let x = ((a.0 - point.0).powi(2) + (a.1 - point.1).powi(2)).sqrt();
+        if let Some(a) = simplified_points.last() {
+            let x = ((a.0 - point.0).powi(2) + (a.1 - point.1).powi(2)).sqrt();
 
-        if x > tolerance as f64 {
-            new_coordinates.push(*point)
+            if x > tolerance {
+                simplified_points.push(*point)
+            }
         }
     }
 
-    new_coordinates.push(*points.last().unwrap());
-
-    new_coordinates
+    simplified_points.push(*points.last().unwrap());
+    simplified_points
 }

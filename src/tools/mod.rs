@@ -1,5 +1,5 @@
-use crate::StaticMap;
-use tiny_skia::{Paint, Pixmap, Shader};
+use crate::bounds::Bounds;
+use tiny_skia::{Paint, PixmapMut, Shader};
 
 mod circle;
 mod icon;
@@ -31,17 +31,10 @@ impl Color {
     }
 }
 
-#[doc(hidden)]
-/// Generic trait implemented by types which can be drawn to a map.
+/// Trait implemented by types which can be drawn to a map.
 pub trait Tool {
     /// Coordinates forming the extent of the object.
-    fn extent(&self) -> (f64, f64, f64, f64);
-    /// Draws the object to the pixmap using a PathBuilder.
-    fn draw(&self, map: &StaticMap, pixmap: &mut Pixmap);
-}
-
-/// Specific trait for markers.
-pub trait Marker: Tool {
-    fn lon_coordinate(&self) -> f64;
-    fn lat_coordinate(&self) -> f64;
+    fn extent(&self, zoom: u8, tile_size: f64) -> (f64, f64, f64, f64);
+    /// Draw the object to the pixmap using a PathBuilder.
+    fn draw(&self, bounds: &Bounds, pixmap: PixmapMut);
 }
