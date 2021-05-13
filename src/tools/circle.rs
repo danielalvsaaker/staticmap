@@ -1,12 +1,11 @@
 use crate::{
+    bounds::Bounds,
     lat_to_y, lon_to_x,
-    tools::{Color, Marker, Tool},
-    StaticMap,
+    tools::{Color, Tool},
+    x_to_lon, y_to_lat, Error, Result,
 };
-use derive_builder::Builder;
-use tiny_skia::{FillRule, PathBuilder, Pixmap, Transform};
+use tiny_skia::{FillRule, PathBuilder, PixmapMut, Transform};
 
-#[derive(Builder)]
 /// Circle tool.
 /// Use [CircleBuilder][CircleBuilder] as an entrypoint.
 ///
@@ -22,37 +21,106 @@ use tiny_skia::{FillRule, PathBuilder, Pixmap, Transform};
 ///     .unwrap();
 /// ```
 pub struct Circle {
-    /// **Required**.
-    /// Latitude coordinate for center of circle.
     lat_coordinate: f64,
-
-    /// **Required**.
-    /// Longitude coordinate for center of circle.
     lon_coordinate: f64,
-
-    #[builder(default)]
-    /// Use [Color][Color] to generate a color instance.
-    /// Default is a black color.
     color: Color,
-
-    #[builder(default = "1.0")]
-    /// Circle radius in pixels.
-    /// Default is 1.0.
     radius: f32,
 }
 
-#[doc(hidden)]
-impl Tool for Circle {
-    fn extent(&self) -> (f64, f64, f64, f64) {
-        let radius: f64 = self.radius.into();
-        (radius, radius, radius, radius)
+/// Builder for [Circle][Circle].
+pub struct CircleBuilder {
+    lat_coordinate: Option<f64>,
+    lon_coordinate: Option<f64>,
+    color: Color,
+    radius: f32,
+}
+
+impl Default for CircleBuilder {
+    fn default() -> Self {
+        Self {
+            lat_coordinate: None,
+            lon_coordinate: None,
+            color: Color::default(),
+            radius: 1.,
+        }
+    }
+}
+
+impl CircleBuilder {
+    /// Create a new builder with defaults.
+    pub fn new() -> Self {
+        Self {
+            lat_coordinate: None,
+            lon_coordinate: None,
+            color: Color::default(),
+            radius: 1.,
+        }
     }
 
-    fn draw(&self, map: &StaticMap, pixmap: &mut Pixmap) {
+    /// **Required**.
+    /// The center of the circle as a latitude coordinate.
+    pub fn lat_coordinate(mut self, coordinate: f64) -> Self {
+        self.lat_coordinate = Some(coordinate);
+        self
+    }
+
+    /// **Required**.
+    /// The center of the circle as a longitude coordinate.
+    pub fn lon_coordinate(mut self, coordinate: f64) -> Self {
+        self.lon_coordinate = Some(coordinate);
+        self
+    }
+
+    /// Use [Color][Color] to generate a color instance.
+    /// Default is a black color.
+    pub fn color(mut self, color: Color) -> Self {
+        self.color = color;
+        self
+    }
+
+    /// Circle radius in pixels.
+    /// Default is 1.0.
+    pub fn radius(mut self, radius: f32) -> Self {
+        self.radius = radius;
+        self
+    }
+
+    /// Build the tool, consuming the builder.
+    /// Returns an error if the builder is missing required fields.
+    pub fn build(self) -> Result<Circle> {
+        Ok(Circle {
+            lat_coordinate: self
+                .lat_coordinate
+                .ok_or(Error::BuildError("Latitude coordinate not supplied."))?,
+            lon_coordinate: self
+                .lon_coordinate
+                .ok_or(Error::BuildError("Longitude coordinate not supplied."))?,
+            color: self.color,
+            radius: self.radius,
+        })
+    }
+}
+
+impl Tool for Circle {
+    fn extent(&self, zoom: u8, tile_size: f64) -> (f64, f64, f64, f64) {
+        let radius: f64 = self.radius.into();
+
+        let x = lon_to_x(self.lon_coordinate, zoom);
+        let y = lat_to_y(self.lat_coordinate, zoom);
+
+        let lon_min = x_to_lon(x - radius / tile_size, zoom);
+        let lat_min = y_to_lat(y + radius / tile_size, zoom);
+        let lon_max = x_to_lon(x + radius / tile_size, zoom);
+        let lat_max = y_to_lat(y - radius / tile_size, zoom);
+
+        (lon_min, lat_min, lon_max, lat_max)
+    }
+
+    fn draw(&self, bounds: &Bounds, mut pixmap: PixmapMut) {
         let mut path_builder = PathBuilder::new();
 
-        let x = map.x_to_px(lon_to_x(self.lon_coordinate, map.zoom.unwrap()));
-        let y = map.y_to_px(lat_to_y(self.lat_coordinate, map.zoom.unwrap()));
+        let x = bounds.x_to_px(lon_to_x(self.lon_coordinate, bounds.zoom));
+        let y = bounds.y_to_px(lat_to_y(self.lat_coordinate, bounds.zoom));
 
         path_builder.push_circle(x as f32, y as f32, self.radius);
 
@@ -66,14 +134,5 @@ impl Tool for Circle {
             Transform::default(),
             None,
         );
-    }
-}
-
-impl Marker for Circle {
-    fn lon_coordinate(&self) -> f64 {
-        self.lon_coordinate
-    }
-    fn lat_coordinate(&self) -> f64 {
-        self.lat_coordinate
     }
 }

@@ -1,55 +1,6 @@
-use crate::{
-    lat_to_y, lon_to_x,
-    tools::{Marker, Tool},
-    StaticMap,
-};
-use derive_builder::Builder;
-use tiny_skia::{Pixmap, PixmapPaint, Transform};
+use crate::{bounds::Bounds, lat_to_y, lon_to_x, tools::Tool, x_to_lon, y_to_lat, Error, Result};
+use tiny_skia::{Pixmap, PixmapMut, PixmapPaint, Transform};
 
-#[derive(Clone)]
-pub struct Image(Pixmap);
-
-impl Image {
-    fn from_bytes(b: &[u8]) -> Self {
-        Self(Pixmap::decode_png(b).expect("Invalid png data."))
-    }
-
-    fn from_path<P: AsRef<std::path::Path>>(p: P) -> Self {
-        Self(Pixmap::load_png(p).expect("Invalid path or file format."))
-    }
-}
-
-impl From<Vec<u8>> for Image {
-    fn from(b: Vec<u8>) -> Image {
-        Self::from_bytes(&b)
-    }
-}
-
-impl From<&[u8]> for Image {
-    fn from(b: &[u8]) -> Image {
-        Self::from_bytes(b)
-    }
-}
-
-impl From<String> for Image {
-    fn from(s: String) -> Image {
-        Self::from_path(s)
-    }
-}
-
-impl From<&str> for Image {
-    fn from(s: &str) -> Image {
-        Self::from_path(s)
-    }
-}
-
-impl From<&std::path::Path> for Image {
-    fn from(p: &std::path::Path) -> Image {
-        Self::from_path(p)
-    }
-}
-
-#[derive(Builder)]
 /// Icon tool.
 /// Use [IconBuilder][IconBuilder] as an entrypoint.
 ///
@@ -62,69 +13,128 @@ impl From<&std::path::Path> for Image {
 ///     .lon_coordinate(50.5)
 ///     .x_offset(3.4)
 ///     .y_offset(10.)
-///     .image("icon.png")
+///     .path("icon.png")
+///     .unwrap()
 ///     .build()
 ///     .unwrap();
 /// ```
 pub struct Icon {
-    /// **Required**.
-    /// Latitude coordinate for center of icon.
     lat_coordinate: f64,
-
-    /// **Required**.
-    /// Longitude coordinate for center of icon.
     lon_coordinate: f64,
-
-    /// **Required**.
-    /// X position of the tip of the icon in pixels, relative to the left bottom of the map.
     x_offset: f64,
-
-    /// **Required**.
-    /// Y position of the tip of the icon in pixels, relative to the left bottom of the map.
     y_offset: f64,
-
-    #[builder(setter(into))]
-    /// **Required**.
-    /// Takes either a `String`/`&str` to a path containing an icon,
-    /// or a `Vec<u8>`/`&[u8]` containing image data.
-    ///
-    /// The icon **must** be a 8-bit png image.
-    /// Panics if the path or data is invalid.
-    image: Image,
+    icon: Pixmap,
 }
 
-#[doc(hidden)]
-impl Tool for Icon {
-    fn extent(&self) -> (f64, f64, f64, f64) {
-        let (width, height) = (self.image.0.width() as f64, self.image.0.height() as f64);
-        (
-            self.x_offset as f64,
-            height - self.y_offset as f64,
-            width - self.x_offset as f64,
-            self.y_offset as f64,
-        )
+#[derive(Default)]
+/// Builder for [Icon][Icon].
+pub struct IconBuilder {
+    lat_coordinate: Option<f64>,
+    lon_coordinate: Option<f64>,
+    x_offset: f64,
+    y_offset: f64,
+    icon: Option<Pixmap>,
+}
+
+impl IconBuilder {
+    /// Create a new builder with defaults.
+    pub fn new() -> Self {
+        Default::default()
     }
 
-    fn draw(&self, map: &StaticMap, pixmap: &mut Pixmap) {
-        let x = map.x_to_px(lon_to_x(self.lon_coordinate, map.zoom.unwrap())) - self.x_offset;
-        let y = map.y_to_px(lat_to_y(self.lat_coordinate, map.zoom.unwrap())) - self.y_offset;
+    /// **Required**.
+    /// The center of the icon as a latitude coordinate.
+    pub fn lat_coordinate(mut self, coordinate: f64) -> Self {
+        self.lat_coordinate = Some(coordinate);
+        self
+    }
+
+    /// **Required**.
+    /// The center of the icon as a longitude coordinate.
+    pub fn lon_coordinate(mut self, coordinate: f64) -> Self {
+        self.lon_coordinate = Some(coordinate);
+        self
+    }
+
+    /// **Required**.
+    /// X position of the icon in pixels, relative to the left bottom of the map.
+    pub fn x_offset(mut self, offset: f64) -> Self {
+        self.x_offset = offset;
+        self
+    }
+
+    /// **Required**.
+    /// Y position of the icon in pixels, relative to the left bottom of the map.
+    pub fn y_offset(mut self, offset: f64) -> Self {
+        self.y_offset = offset;
+        self
+    }
+
+    /// **Required**.
+    /// Path to a 8-bit PNG image file.
+    pub fn path<P: AsRef<std::path::Path>>(mut self, path: P) -> Result<Self> {
+        self.icon = Some(Pixmap::load_png(path)?);
+        Ok(self)
+    }
+
+    /// **Required**.
+    /// Load an 8-bit PNG image from bytes.
+    pub fn data<D: AsRef<[u8]>>(mut self, data: D) -> Result<Self> {
+        self.icon = Some(Pixmap::decode_png(data.as_ref())?);
+        Ok(self)
+    }
+
+    /// Build the tool, consuming the builder.
+    /// Return an error if the builder is missing required fields.
+    pub fn build(self) -> Result<Icon> {
+        Ok(Icon {
+            lat_coordinate: self
+                .lat_coordinate
+                .ok_or(Error::BuildError("Latitude coordinate not supplied."))?,
+            lon_coordinate: self
+                .lon_coordinate
+                .ok_or(Error::BuildError("Longitude coordinate not supplied."))?,
+            x_offset: self.x_offset,
+            y_offset: self.y_offset,
+            icon: self
+                .icon
+                .ok_or(Error::BuildError("Icon image not supplied."))?,
+        })
+    }
+}
+
+impl Tool for Icon {
+    fn extent(&self, zoom: u8, tile_size: f64) -> (f64, f64, f64, f64) {
+        let (width, height): (f64, f64) = (self.icon.width().into(), self.icon.height().into());
+        let extent = (
+            self.x_offset,
+            height - self.y_offset,
+            width - self.x_offset,
+            self.y_offset,
+        );
+
+        let x = lon_to_x(self.lon_coordinate, zoom);
+        let y = lat_to_y(self.lat_coordinate, zoom);
+
+        let lon_min = x_to_lon(x - extent.0 / tile_size, zoom);
+        let lat_min = y_to_lat(y + extent.1 / tile_size, zoom);
+        let lon_max = x_to_lon(x + extent.2 / tile_size, zoom);
+        let lat_max = y_to_lat(y - extent.3 / tile_size, zoom);
+
+        (lon_min, lat_min, lon_max, lat_max)
+    }
+
+    fn draw(&self, bounds: &Bounds, mut pixmap: PixmapMut) {
+        let x = bounds.x_to_px(lon_to_x(self.lon_coordinate, bounds.zoom)) - self.x_offset;
+        let y = bounds.y_to_px(lat_to_y(self.lat_coordinate, bounds.zoom)) - self.y_offset;
 
         pixmap.draw_pixmap(
             x as i32,
             y as i32,
-            self.image.0.as_ref(),
+            self.icon.as_ref(),
             &PixmapPaint::default(),
             Transform::default(),
             None,
         );
-    }
-}
-
-impl Marker for Icon {
-    fn lon_coordinate(&self) -> f64 {
-        self.lon_coordinate
-    }
-    fn lat_coordinate(&self) -> f64 {
-        self.lat_coordinate
     }
 }

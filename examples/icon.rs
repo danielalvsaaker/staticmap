@@ -1,35 +1,32 @@
-use staticmap::{tools::IconBuilder, StaticMapBuilder, StaticMapError};
+use staticmap::{tools::IconBuilder, Error, StaticMapBuilder};
 
-fn main() -> Result<(), StaticMapError> {
-    let mut map = StaticMapBuilder::default()
+fn main() -> Result<(), Error> {
+    let mut map = StaticMapBuilder::new()
         .width(200)
         .height(200)
         .padding((80, 0))
         .url_template("https://a.tile.osm.org/{z}/{x}/{y}.png")
         .zoom(12)
-        .build()
-        .unwrap();
+        .build()?;
 
-    let icon_flag = IconBuilder::default()
+    let icon_flag = IconBuilder::new()
         .lon_coordinate(6.63204)
         .lat_coordinate(45.85378)
         .x_offset(12.)
         .y_offset(32.)
-        .image("examples/icons/icon-flag.png")
-        .build()
-        .unwrap();
+        .path("examples/icons/icon-flag.png")?
+        .build()?;
 
-    let icon_factory = IconBuilder::default()
+    let icon_factory = IconBuilder::new()
         .lon_coordinate(6.6015)
         .lat_coordinate(45.8485)
         .x_offset(18.)
         .y_offset(18.)
-        .image("examples/icons/icon-factory.png")
-        .build()
-        .unwrap();
+        .path("examples/icons/icon-factory.png")?
+        .build()?;
 
-    map.add_marker(icon_flag);
-    map.add_marker(icon_factory);
+    map.add_tool(icon_flag);
+    map.add_tool(icon_factory);
 
     map.save_png("icon.png")?;
 

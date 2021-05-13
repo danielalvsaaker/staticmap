@@ -1,36 +1,64 @@
 #[derive(Debug)]
-pub enum StaticMapError {
-    /// Error when encoding image to png.
+/// An enum containing all possible errors when interacting with this library.
+pub enum Error {
+    /// Error when encoding image to PNG.
     PngEncodingError(png::EncodingError),
-    /// Either invalid url or request failure.
+
+    /// Error when decoding PNG from bytes.
+    PngDecodingError(png::DecodingError),
+
+    /// Request error when fetching tile from a tile server.
     TileError {
-        error: png::DecodingError,
+        /// Internal error from the HTTP client.
+        error: attohttpc::Error,
+        /// The URL which failed.
         url: String,
     },
+
     /// Invalid image size.
     InvalidSize,
+
+    /// Missing a field/fields when consuming a builder.
+    BuildError(&'static str),
 }
 
-impl std::error::Error for StaticMapError {
+impl From<png::EncodingError> for Error {
+    fn from(e: png::EncodingError) -> Self {
+        Self::PngEncodingError(e)
+    }
+}
+
+impl From<png::DecodingError> for Error {
+    fn from(e: png::DecodingError) -> Self {
+        Self::PngDecodingError(e)
+    }
+}
+
+impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
-            StaticMapError::PngEncodingError(ref error) => Some(error),
-            StaticMapError::TileError { ref error, .. } => Some(error),
+            Error::PngEncodingError(ref error) => Some(error),
+            Error::PngDecodingError(ref error) => Some(error),
+            Error::TileError { ref error, .. } => Some(error),
             _ => None,
         }
     }
 }
 
-impl std::fmt::Display for StaticMapError {
+impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            StaticMapError::InvalidSize => write!(f, "Width or height of map is invalid."),
-            StaticMapError::PngEncodingError(ref error) => write!(f, "{}.", error),
-            StaticMapError::TileError { ref error, ref url } => write!(
-                f,
-                "Failed to get or encode tile with url {}. {}.",
-                url, error
-            ),
+            Error::InvalidSize => write!(f, "Width or height of map is invalid."),
+            Error::PngEncodingError(ref error) => write!(f, "{}.", error),
+            Error::PngDecodingError(ref error) => write!(f, "{}.", error),
+            Error::BuildError(ref error) => write!(f, "{}.", error),
+            Error::TileError { ref error, ref url } => {
+                write!(
+                    f,
+                    "Failed to get tile with url {}. Internal error: {}.",
+                    url, error
+                )
+            }
         }
     }
 }

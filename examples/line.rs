@@ -1,10 +1,10 @@
 use staticmap::{
     tools::{Color, LineBuilder},
-    StaticMapBuilder, StaticMapError,
+    Error, StaticMapBuilder,
 };
 
-fn main() -> Result<(), StaticMapError> {
-    let mut map = StaticMapBuilder::default()
+fn main() -> Result<(), Error> {
+    let mut map = StaticMapBuilder::new()
         .width(300)
         .height(400)
         .padding((10, 0))
@@ -17,26 +17,24 @@ fn main() -> Result<(), StaticMapError> {
     let red = Color::new(true, 255, 0, 0, 255);
     let white = Color::new(true, 255, 255, 255, 255);
 
-    let line = LineBuilder::default()
-        .lat_coordinates(lat)
+    let line = LineBuilder::new()
+        .lat_coordinates(lat.into_iter().copied())
         .lon_coordinates(lon.clone())
         .width(3.)
         .simplify(true)
         .color(red)
-        .build()
-        .unwrap();
+        .build()?;
 
-    let underline = LineBuilder::default()
-        .lat_coordinates(lat)
+    let underline = LineBuilder::new()
+        .lat_coordinates(lat.into_iter().copied())
         .lon_coordinates(lon)
         .width(5.)
         .simplify(true)
         .color(white)
-        .build()
-        .unwrap();
+        .build()?;
 
-    map.add_line(underline);
-    map.add_line(line);
+    map.add_tool(underline);
+    map.add_tool(line);
 
     map.save_png("line.png")?;
 
