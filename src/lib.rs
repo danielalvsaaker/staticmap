@@ -46,11 +46,14 @@
 //! }
 //! ```
 
+
+#![warn(missing_docs)]
+
 mod bounds;
 mod error;
 mod map;
 
-/// Tools for drawing features on to the map.
+/// Tools for drawing features onto the map.
 pub mod tools;
 
 pub use bounds::Bounds;

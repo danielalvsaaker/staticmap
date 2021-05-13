@@ -7,7 +7,6 @@ fn main() -> Result<(), Error> {
     let mut map = StaticMapBuilder::new()
         .width(300)
         .height(400)
-        .url_template("vg.no")
         .padding((10, 0))
         .build()
         .unwrap();

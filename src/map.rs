@@ -3,7 +3,7 @@ use crate::{
     tools::Tool,
     Error, Result,
 };
-use attohttpc::{Method, RequestBuilder};
+use attohttpc::{Method, RequestBuilder, Response};
 use rayon::prelude::*;
 use tiny_skia::{Pixmap, PixmapMut, PixmapPaint, Transform};
 
@@ -30,6 +30,7 @@ pub struct StaticMap {
     bounds: BoundsBuilder,
 }
 
+/// Builder for [StaticMap][StaticMap].
 pub struct StaticMapBuilder {
     width: u32,
     height: u32,
@@ -143,14 +144,14 @@ impl StaticMap {
         self.tools.push(Box::new(tool));
     }
 
-    /// Render the map and encode as png.
+    /// Render the map and encode as PNG.
     ///
     /// May panic if any feature has invalid bounds.
     pub fn encode_png(&mut self) -> Result<Vec<u8>> {
         Ok(self.render()?.encode_png()?)
     }
 
-    /// Render the map and save as png to a file.
+    /// Render the map and save as PNG to a file.
     ///
     /// May panic if any feature has invalid bounds.
     pub fn save_png<P: AsRef<::std::path::Path>>(&mut self, path: P) -> Result<()> {
@@ -165,10 +166,8 @@ impl StaticMap {
 
         self.draw_base_layer(image.as_mut(), &bounds)?;
 
-        if !self.tools.is_empty() {
-            for tool in self.tools.iter() {
-                tool.draw(&bounds, image.as_mut());
-            }
+        for tool in self.tools.iter() {
+            tool.draw(&bounds, image.as_mut());
         }
 
         Ok(image)
@@ -210,7 +209,7 @@ impl StaticMap {
             .map(|x| {
                 RequestBuilder::try_new(Method::GET, &x.2)
                     .and_then(RequestBuilder::send)
-                    .and_then(attohttpc::Response::bytes)
+                    .and_then(Response::bytes)
                     .map_err(|error| Error::TileError {
                         error,
                         url: x.2.clone(),

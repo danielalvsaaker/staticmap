@@ -3,20 +3,33 @@ use crate::{lat_to_y, lon_to_x, tools::Tool};
 /// Helper struct for converting to pixels,
 /// and to pass information about map bounds to implementors of [Tool][Tool].
 pub struct Bounds {
+    /// Height of the map in pixels.
     pub height: u32,
+
+    /// Width of the map in pixels.
     pub width: u32,
+
+    /// X coordinate of the map's center.
     pub x_center: f64,
+
+    /// Y coordinate of the map's center.
     pub y_center: f64,
+
+    /// Tile size in pixels.
     pub tile_size: u32,
+
+    /// Map zoom.
     pub zoom: u8,
 }
 
 impl Bounds {
+    /// Helper function for converting an x coordinate to pixel.
     pub fn x_to_px(&self, x: f64) -> f64 {
         let px = (x - self.x_center) * f64::from(self.tile_size) + f64::from(self.width) / 2.;
         px.round()
     }
 
+    /// Helper function for converting a y coordinate to pixel.
     pub fn y_to_px(&self, y: f64) -> f64 {
         let px = (y - self.y_center) * f64::from(self.tile_size) + f64::from(self.width) / 2.;
         px.round()

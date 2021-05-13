@@ -20,19 +20,9 @@ use tiny_skia::{Pixmap, PixmapMut, PixmapPaint, Transform};
 /// ```
 pub struct Icon {
     lat_coordinate: f64,
-
-    /// **Required**.
-    /// Longitude coordinate for center of icon.
     lon_coordinate: f64,
-
-    /// **Required**.
-    /// X position of the tip of the icon in pixels, relative to the left bottom of the map.
     x_offset: f64,
-
-    /// **Required**.
-    /// Y position of the tip of the icon in pixels, relative to the left bottom of the map.
     y_offset: f64,
-
     icon: Pixmap,
 }
 
@@ -47,6 +37,7 @@ pub struct IconBuilder {
 }
 
 impl IconBuilder {
+    /// Create a new builder with defaults.
     pub fn new() -> Self {
         Default::default()
     }
@@ -65,14 +56,14 @@ impl IconBuilder {
         self
     }
 
-    /// **Required.***
+    /// **Required**.
     /// X position of the icon in pixels, relative to the left bottom of the map.
     pub fn x_offset(mut self, offset: f64) -> Self {
         self.x_offset = offset;
         self
     }
 
-    /// **Required.***
+    /// **Required**.
     /// Y position of the icon in pixels, relative to the left bottom of the map.
     pub fn y_offset(mut self, offset: f64) -> Self {
         self.y_offset = offset;

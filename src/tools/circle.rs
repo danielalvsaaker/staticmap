@@ -27,6 +27,7 @@ pub struct Circle {
     radius: f32,
 }
 
+/// Builder for [Circle][Circle].
 pub struct CircleBuilder {
     lat_coordinate: Option<f64>,
     lon_coordinate: Option<f64>,
@@ -46,6 +47,7 @@ impl Default for CircleBuilder {
 }
 
 impl CircleBuilder {
+    /// Create a new builder with defaults.
     pub fn new() -> Self {
         Self {
             lat_coordinate: None,

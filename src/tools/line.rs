@@ -27,6 +27,7 @@ pub struct Line {
     tolerance: f64,
 }
 
+/// Builder for [Line][Line].
 pub struct LineBuilder {
     lat_coordinates: Option<Vec<f64>>,
     lon_coordinates: Option<Vec<f64>>,
@@ -50,6 +51,7 @@ impl Default for LineBuilder {
 }
 
 impl LineBuilder {
+    /// Create a new builder with defaults.
     pub fn new() -> Self {
         Default::default()
     }

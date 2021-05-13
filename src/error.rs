@@ -1,15 +1,24 @@
 #[derive(Debug)]
+/// An enum containing all possible errors when interacting with this library.
 pub enum Error {
-    /// Error when encoding image to png.
+    /// Error when encoding image to PNG.
     PngEncodingError(png::EncodingError),
+
+    /// Error when decoding PNG from bytes.
     PngDecodingError(png::DecodingError),
-    /// Either invalid url or request failure.
+
+    /// Request error when fetching tile from a tile server.
     TileError {
+        /// Internal error from the HTTP client.
         error: attohttpc::Error,
+        /// The URL which failed.
         url: String,
     },
+
     /// Invalid image size.
     InvalidSize,
+
+    /// Missing a field/fields when consuming a builder.
     BuildError(&'static str),
 }
 

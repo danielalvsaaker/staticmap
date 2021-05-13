@@ -22,6 +22,7 @@ pub use line::{Line, LineBuilder};
 pub struct Color(Paint<'static>);
 
 impl Color {
+    /// Creates a new [Color][Color] instance based on RGBA values.
     pub fn new(anti_alias: bool, r: u8, g: u8, b: u8, a: u8) -> Color {
         Color(Paint {
             shader: Shader::SolidColor(tiny_skia::Color::from_rgba8(r, g, b, a)),
