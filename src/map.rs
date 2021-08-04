@@ -174,35 +174,26 @@ impl StaticMap {
     }
 
     fn draw_base_layer(&self, mut image: PixmapMut, bounds: &Bounds) -> Result<()> {
-        let x_min = (bounds.x_center
-            - (0.5 * f64::from(bounds.width) / f64::from(bounds.tile_size)))
-        .floor() as i32;
-        let y_min = (bounds.y_center
-            - (0.5 * f64::from(bounds.height) / f64::from(bounds.tile_size)))
-        .floor() as i32;
-        let x_max = (bounds.x_center
-            + (0.5 * f64::from(bounds.width) / f64::from(bounds.tile_size)))
-        .ceil() as i32;
-        let y_max = (bounds.y_center
-            + (0.5 * f64::from(bounds.height) / f64::from(bounds.tile_size)))
-        .ceil() as i32;
+        let max_tile: i32 = 2_i32.pow(bounds.zoom.into());
 
-        let mut tiles: Vec<(i32, i32, String)> = Vec::new();
-        for x in x_min..x_max {
-            for y in y_min..y_max {
-                let max_tile: i32 = 2_i32.pow(bounds.zoom.into());
-                let tile_x = (x + max_tile) % max_tile;
-                let tile_y = (y + max_tile) % max_tile;
+        let tiles: Vec<(i32, i32, String)> = (bounds.x_min..bounds.x_max)
+            .map(|x| (x, bounds.y_min..bounds.y_max))
+            .flat_map(|(x, y_r)| {
+                y_r.map(move |y| {
+                    let tile_x = (x + max_tile) % max_tile;
+                    let tile_y = (y + max_tile) % max_tile;
 
-                let url = self
-                    .url_template
-                    .replace("{z}", &bounds.zoom.to_string())
-                    .replace("{x}", &tile_x.to_string())
-                    .replace("{y}", &tile_y.to_string());
-
-                tiles.push((x, y, url));
-            }
-        }
+                    (
+                        x,
+                        y,
+                        self.url_template
+                            .replace("{z}", &bounds.zoom.to_string())
+                            .replace("{x}", &tile_x.to_string())
+                            .replace("{y}", &tile_y.to_string()),
+                    )
+                })
+            })
+            .collect();
 
         let tile_images: Vec<_> = tiles
             .par_iter()

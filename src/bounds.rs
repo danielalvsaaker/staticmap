@@ -15,6 +15,18 @@ pub struct Bounds {
     /// Y coordinate of the map's center.
     pub y_center: f64,
 
+    /// Minimum tile on the x axis.
+    pub x_min: i32,
+
+    /// Maximum tile on the x axis.
+    pub x_max: i32,
+
+    /// Minimum tile on the y axis.
+    pub y_min: i32,
+
+    /// Maximum tile on the y axis.
+    pub y_max: i32,
+
     /// Tile size in pixels.
     pub tile_size: u32,
 
@@ -111,11 +123,26 @@ impl BoundsBuilder {
         let x_center = lon_to_x(lon_center, zoom);
         let y_center = lat_to_y(lat_center, zoom);
 
+        let x_m = 0.5 * f64::from(self.width) / f64::from(self.tile_size);
+        let y_m = 0.5 * f64::from(self.height) / f64::from(self.tile_size);
+
+        let x_min = (x_center - x_m).floor() as i32;
+
+        let x_max = (x_center + x_m).ceil() as i32;
+
+        let y_min = (y_center - y_m).floor() as i32;
+
+        let y_max = (y_center + y_m).ceil() as i32;
+
         Bounds {
             height: self.height,
             width: self.width,
             x_center,
             y_center,
+            x_min,
+            x_max,
+            y_min,
+            y_max,
             tile_size: self.tile_size,
             zoom,
         }

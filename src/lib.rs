@@ -46,7 +46,6 @@
 //! }
 //! ```
 
-
 #![warn(missing_docs)]
 
 mod bounds;
