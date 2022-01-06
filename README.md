@@ -1,3 +1,4 @@
+[![Build Status](https://dr.nopemail.org/api/badges/danielalvsaaker/staticmap/status.svg)](https://dr.nopemail.org/danielalvsaaker/staticmap)
 [![docs](https://img.shields.io/docsrs/staticmap/latest)](https://docs.rs/staticmap)
 [![crate](https://img.shields.io/crates/v/staticmap)](https://crates.io/crates/staticmap)
 
