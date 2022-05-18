@@ -125,14 +125,15 @@ impl Tool for Circle {
         path_builder.push_circle(x as f32, y as f32, self.radius);
 
         path_builder.close();
-        let path = path_builder.finish().unwrap();
 
-        pixmap.fill_path(
-            &path,
-            &self.color.0,
-            FillRule::default(),
-            Transform::default(),
-            None,
-        );
+        if let Some(path) = path_builder.finish() {
+            pixmap.fill_path(
+                &path,
+                &self.color.0,
+                FillRule::default(),
+                Transform::default(),
+                None,
+            );
+        }
     }
 }
