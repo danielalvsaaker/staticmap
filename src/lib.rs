@@ -114,6 +114,9 @@ fn simplify(points: Vec<(f64, f64)>, tolerance: f64) -> Vec<(f64, f64)> {
         }
     }
 
-    simplified_points.push(*points.last().unwrap());
+    let last_point = points
+        .last()
+        .expect("Internal logic error - 'points' must have at least two points");
+    simplified_points.push(*last_point);
     simplified_points
 }
