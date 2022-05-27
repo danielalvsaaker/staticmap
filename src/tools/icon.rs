@@ -13,7 +13,7 @@ use tiny_skia::{Pixmap, PixmapMut, PixmapPaint, Transform};
 ///     .lon_coordinate(50.5)
 ///     .x_offset(3.4)
 ///     .y_offset(10.)
-///     .path("icon.png")
+///     .path("examples/icons/icon-flag.png")
 ///     .unwrap()
 ///     .build()
 ///     .unwrap();

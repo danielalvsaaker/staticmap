@@ -176,18 +176,18 @@ impl Tool for Line {
             }
         }
 
-        let path = path_builder.finish().unwrap();
-
-        pixmap.stroke_path(
-            &path,
-            &self.color.0,
-            &Stroke {
-                width: self.width,
-                line_cap: LineCap::Round,
-                ..Default::default()
-            },
-            Transform::default(),
-            None,
-        );
+        if let Some(path) = path_builder.finish() {
+            pixmap.stroke_path(
+                &path,
+                &self.color.0,
+                &Stroke {
+                    width: self.width,
+                    line_cap: LineCap::Round,
+                    ..Default::default()
+                },
+                Transform::default(),
+                None,
+            );
+        }
     }
 }

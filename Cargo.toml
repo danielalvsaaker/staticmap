@@ -12,7 +12,7 @@ categories = ["multimedia::images"]
 keywords = ["openstreetmap", "osm", "map"]
 
 [dependencies]
-attohttpc = { version = "0.17", default-features = false, features = ["tls-rustls"] }
-png = { version = "0.16", default-features = false }
+attohttpc = { version = "0.19", default-features = false, features = ["tls-rustls"] }
+png = { version = "0.17", default-features = false }
 rayon = "1.5"
-tiny-skia = "0.5"
+tiny-skia = "0.6"
