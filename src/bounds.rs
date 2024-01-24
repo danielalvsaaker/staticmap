@@ -43,7 +43,7 @@ impl Bounds {
 
     /// Helper function for converting a y coordinate to pixel.
     pub fn y_to_px(&self, y: f64) -> f64 {
-        let px = (y - self.y_center) * f64::from(self.tile_size) + f64::from(self.width) / 2.;
+        let px = (y - self.y_center) * f64::from(self.tile_size) + f64::from(self.height) / 2.;
         px.round()
     }
 }
