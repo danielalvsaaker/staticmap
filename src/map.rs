@@ -28,6 +28,7 @@ pub struct StaticMap {
     url_template: String,
     tools: Vec<Box<dyn Tool>>,
     bounds: BoundsBuilder,
+    tile_fetcher: Box<dyn TileFetcher>,
 }
 
 /// Builder for [StaticMap][StaticMap].
@@ -40,6 +41,7 @@ pub struct StaticMapBuilder {
     lon_center: Option<f64>,
     url_template: String,
     tile_size: u32,
+    tile_fetcher: Box<dyn TileFetcher>,
 }
 
 impl Default for StaticMapBuilder {
@@ -53,6 +55,7 @@ impl Default for StaticMapBuilder {
             lon_center: None,
             url_template: "https://a.tile.osm.org/{z}/{x}/{y}.png".to_string(),
             tile_size: 256,
+            tile_fetcher: Box::new(DefaultTileFetcher),
         }
     }
 }
@@ -119,6 +122,11 @@ impl StaticMapBuilder {
         self
     }
 
+    pub fn tile_fetcher(mut self, tile_fetcher: impl TileFetcher + 'static) -> Self {
+        self.tile_fetcher = Box::new(tile_fetcher);
+        self
+    }
+
     /// Consumes the builder.
     pub fn build(self) -> Result<StaticMap> {
         let bounds = BoundsBuilder::new()
@@ -134,6 +142,7 @@ impl StaticMapBuilder {
             url_template: self.url_template,
             tools: Vec::new(),
             bounds,
+            tile_fetcher: self.tile_fetcher,
         })
     }
 }
@@ -195,8 +204,7 @@ impl StaticMap {
             })
             .collect();
 
-        let fetcher = DefaultTileFetcher;
-        let tile_images = fetcher.fetch(
+        let tile_images = self.tile_fetcher.fetch(
             &tiles
                 .iter()
                 .map(|(_, _, url)| url.as_ref())
