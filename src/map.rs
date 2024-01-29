@@ -195,18 +195,13 @@ impl StaticMap {
             })
             .collect();
 
-        let tile_images: Vec<_> = tiles
-            .par_iter()
-            .map(|x| {
-                RequestBuilder::try_new(Method::GET, &x.2)
-                    .and_then(RequestBuilder::send)
-                    .and_then(Response::bytes)
-                    .map_err(|error| Error::TileError {
-                        error,
-                        url: x.2.clone(),
-                    })
-            })
-            .collect();
+        let fetcher = DefaultTileFetcher;
+        let tile_images = fetcher.fetch(
+            &tiles
+                .iter()
+                .map(|(_, _, url)| url.as_ref())
+                .collect::<Vec<_>>(),
+        );
 
         for (tile, tile_image) in tiles.iter().zip(tile_images) {
             let (x, y) = (tile.0, tile.1);
@@ -225,5 +220,29 @@ impl StaticMap {
         }
 
         Ok(())
+    }
+}
+
+pub trait TileFetcher {
+    fn fetch(&self, tile_urls: &[&str]) -> Vec<std::result::Result<Vec<u8>, crate::error::Error>>;
+}
+
+#[derive(Default)]
+pub struct DefaultTileFetcher;
+
+impl TileFetcher for DefaultTileFetcher {
+    fn fetch(&self, tile_urls: &[&str]) -> Vec<std::result::Result<Vec<u8>, crate::error::Error>> {
+        tile_urls
+            .par_iter()
+            .map(|tile_url| {
+                RequestBuilder::try_new(Method::GET, &tile_url)
+                    .and_then(RequestBuilder::send)
+                    .and_then(Response::bytes)
+                    .map_err(|error| Error::TileError {
+                        error,
+                        url: tile_url.to_string(),
+                    })
+            })
+            .collect()
     }
 }
