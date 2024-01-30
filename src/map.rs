@@ -1,10 +1,9 @@
 use crate::{
     bounds::{Bounds, BoundsBuilder},
+    fetchers::{self, TileFetcher},
     tools::Tool,
     Error, Result,
 };
-use attohttpc::{Method, RequestBuilder, Response};
-use rayon::prelude::*;
 use tiny_skia::{Pixmap, PixmapMut, PixmapPaint, Transform};
 
 /// Main type.
@@ -55,7 +54,10 @@ impl Default for StaticMapBuilder {
             lon_center: None,
             url_template: "https://a.tile.osm.org/{z}/{x}/{y}.png".to_string(),
             tile_size: 256,
-            tile_fetcher: Box::new(DefaultTileFetcher),
+            #[cfg(feature = "default-tile-fetcher")]
+            tile_fetcher: Box::new(fetchers::DefaultTileFetcher),
+            #[cfg(not(feature = "default-tile-fetcher"))]
+            tile_fetcher: Box::new(fetchers::NoopTileFetcher),
         }
     }
 }
@@ -228,29 +230,5 @@ impl StaticMap {
         }
 
         Ok(())
-    }
-}
-
-pub trait TileFetcher {
-    fn fetch(&self, tile_urls: &[&str]) -> Vec<std::result::Result<Vec<u8>, crate::error::Error>>;
-}
-
-#[derive(Default)]
-pub struct DefaultTileFetcher;
-
-impl TileFetcher for DefaultTileFetcher {
-    fn fetch(&self, tile_urls: &[&str]) -> Vec<std::result::Result<Vec<u8>, crate::error::Error>> {
-        tile_urls
-            .par_iter()
-            .map(|tile_url| {
-                RequestBuilder::try_new(Method::GET, &tile_url)
-                    .and_then(RequestBuilder::send)
-                    .and_then(Response::bytes)
-                    .map_err(|error| Error::TileError {
-                        error,
-                        url: tile_url.to_string(),
-                    })
-            })
-            .collect()
     }
 }
