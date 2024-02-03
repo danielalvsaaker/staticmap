@@ -10,7 +10,7 @@ pub enum Error {
     /// Request error when fetching tile from a tile server.
     TileError {
         /// Internal error from the HTTP client.
-        error: Box<dyn std::error::Error + Send>,
+        error: Box<dyn std::error::Error>,
         /// The URL which failed.
         url: String,
     },
