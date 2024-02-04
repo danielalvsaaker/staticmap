@@ -55,6 +55,7 @@ mod map;
 /// Tools for drawing features onto the map.
 pub mod tools;
 
+/// Tile Fetching Strategies for Static Map Generation.
 pub mod fetchers;
 
 pub use bounds::Bounds;

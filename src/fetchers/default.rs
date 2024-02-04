@@ -3,6 +3,18 @@ use rayon::prelude::*;
 
 use crate::{fetchers::TileFetcher, Error};
 
+/// `DefaultTileFetcher` is the default implementation of the `TileFetcher` trait,
+/// designed to fetch raster tiles from Open Street Map (OSM) providers concurrently.
+/// It leverages `attohttpc` for making HTTP GET requests and `rayon` for parallelizing
+/// the fetch operations across multiple URLs.
+///
+/// If the request is successful, it returns the raw bytes of the tile image.
+/// In case of failure, it wraps the error along with the offending URL in a
+/// `TileError` and returns it, allowing for easy identification of problematic requests.
+///
+/// This implementation is suitable for most use cases requiring tile fetching from
+/// OSM or similar tile providers. It optimizes for speed and error handling, making
+/// it a robust choice for applications needing reliable tile retrieval.
 pub struct DefaultTileFetcher;
 
 impl TileFetcher for DefaultTileFetcher {

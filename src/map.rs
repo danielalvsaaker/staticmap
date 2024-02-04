@@ -124,6 +124,7 @@ impl StaticMapBuilder {
         self
     }
 
+    /// Sets a custom `TileFetcher`.
     pub fn tile_fetcher(mut self, tile_fetcher: impl TileFetcher + 'static) -> Self {
         self.tile_fetcher = Box::new(tile_fetcher);
         self

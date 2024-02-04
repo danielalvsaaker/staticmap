@@ -1,5 +1,8 @@
 use crate::fetchers::TileFetcher;
 
+/// `NoopTileFetcher` is a no-operation (noop) implementation of the `TileFetcher` trait,
+/// designed as a default placeholder within the `StaticMapBuilder`. This implementation
+/// avoids performing any network requests or actual tile retrieval operations.
 pub struct NoopTileFetcher;
 
 impl TileFetcher for NoopTileFetcher {
