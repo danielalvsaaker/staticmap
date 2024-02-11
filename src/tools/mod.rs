@@ -4,9 +4,11 @@ use tiny_skia::{Paint, PixmapMut, Shader};
 mod circle;
 mod icon;
 mod line;
+mod rect;
 pub use circle::{Circle, CircleBuilder};
 pub use icon::{Icon, IconBuilder};
 pub use line::{Line, LineBuilder};
+pub use rect::{Rect, RectBuilder};
 
 #[derive(Clone, Default)]
 /// Path color.
