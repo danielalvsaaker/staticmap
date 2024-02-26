@@ -165,10 +165,23 @@ impl BoundsBuilder {
             .map(|x| x.extent(zoom, self.tile_size.into()))
             .collect();
 
-        self.lon_min = extent.iter().map(|x| x.0).fold(f64::NAN, f64::min);
-        self.lat_min = extent.iter().map(|x| x.1).fold(f64::NAN, f64::min);
-        self.lon_max = extent.iter().map(|x| x.2).fold(f64::NAN, f64::max);
-        self.lat_max = extent.iter().map(|x| x.3).fold(f64::NAN, f64::max);
+        let lon_min = extent.iter().map(|x| x.0).fold(f64::NAN, f64::min);
+        let lat_min = extent.iter().map(|x| x.1).fold(f64::NAN, f64::min);
+        let lon_max = extent.iter().map(|x| x.2).fold(f64::NAN, f64::max);
+        let lat_max = extent.iter().map(|x| x.3).fold(f64::NAN, f64::max);
+
+        if let (Some(lon), Some(lat)) = (self.lon_center, self.lat_center) {
+            // Adjust bounds to center on (lon_center, lat_center), expanding as needed
+            self.lon_min = lon_min.min(2. * lon - lon_max);
+            self.lat_min = lat_min.min(2. * lat - lat_max);
+            self.lon_max = lon_max.max(2. * lon - lon_min);
+            self.lat_max = lat_max.max(2. * lat - lat_min);
+        } else {
+            self.lon_min = lon_min;
+            self.lat_min = lat_min;
+            self.lon_max = lon_max;
+            self.lat_max = lat_max;
+        }
     }
 
     fn calculate_zoom(&mut self, tools: &[Box<dyn Tool>]) -> u8 {
