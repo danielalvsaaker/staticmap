@@ -1,4 +1,4 @@
-use crate::{lat_to_y, lon_to_x, tools::Tool};
+use crate::{lat_to_y, lon_to_x, tools::Tool, y_to_lat};
 
 /// Helper struct for converting to pixels,
 /// and to pass information about map bounds to implementors of [Tool][Tool].
@@ -114,10 +114,14 @@ impl BoundsBuilder {
 
         let (lon_center, lat_center) = match self.lon_center.zip(self.lat_center) {
             Some((x, y)) => (x, y),
-            _ => (
-                (self.lon_min + self.lon_max) / 2.,
-                (self.lat_min + self.lat_max) / 2.,
-            ),
+            _ => {
+                let y_min = lat_to_y(self.lat_max, zoom);
+                let y_max = lat_to_y(self.lat_min, zoom);
+                (
+                    (self.lon_min + self.lon_max) / 2.,
+                    y_to_lat((y_min + y_max) / 2., zoom),
+                )
+            }
         };
 
         let x_center = lon_to_x(lon_center, zoom);
