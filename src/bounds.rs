@@ -112,16 +112,16 @@ impl BoundsBuilder {
             self.calculate_zoom(tools)
         };
 
-        let (lon_center, lat_center) = match self.lon_center.zip(self.lat_center) {
-            Some((x, y)) => (x, y),
-            _ => (
-                (self.lon_min + self.lon_max) / 2.,
-                (self.lat_min + self.lat_max) / 2.,
-            ),
+        let (x_center, y_center) = match self.lon_center.zip(self.lat_center) {
+            Some((lon, lat)) => (lon_to_x(lon, zoom), lat_to_y(lat, zoom)),
+            _ => {
+                let x_min = lon_to_x(self.lon_min, zoom);
+                let x_max = lon_to_x(self.lon_max, zoom);
+                let y_min = lat_to_y(self.lat_max, zoom);
+                let y_max = lat_to_y(self.lat_min, zoom);
+                ((x_min + x_max) / 2., (y_min + y_max) / 2.)
+            }
         };
-
-        let x_center = lon_to_x(lon_center, zoom);
-        let y_center = lat_to_y(lat_center, zoom);
 
         let x_m = 0.5 * f64::from(self.width) / f64::from(self.tile_size);
         let y_m = 0.5 * f64::from(self.height) / f64::from(self.tile_size);
