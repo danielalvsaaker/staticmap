@@ -30,3 +30,6 @@ Examples can be run with `cargo run --example <example name>`.
 
 ### Icon
 ![icon](/examples/results/icon.png)
+
+### Rect
+![rect](/examples/results/rect.png)
