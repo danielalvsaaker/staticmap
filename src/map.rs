@@ -1,10 +1,9 @@
 use crate::{
     bounds::{Bounds, BoundsBuilder},
+    fetchers::{self, TileFetcher},
     tools::Tool,
     Error, Result,
 };
-use attohttpc::{Method, RequestBuilder, Response};
-use rayon::prelude::*;
 use tiny_skia::{Pixmap, PixmapMut, PixmapPaint, Transform};
 
 /// Main type.
@@ -28,6 +27,7 @@ pub struct StaticMap {
     url_template: String,
     tools: Vec<Box<dyn Tool>>,
     bounds: BoundsBuilder,
+    tile_fetcher: Box<dyn TileFetcher>,
 }
 
 /// Builder for [StaticMap][StaticMap].
@@ -40,6 +40,7 @@ pub struct StaticMapBuilder {
     lon_center: Option<f64>,
     url_template: String,
     tile_size: u32,
+    tile_fetcher: Box<dyn TileFetcher>,
 }
 
 impl Default for StaticMapBuilder {
@@ -53,6 +54,10 @@ impl Default for StaticMapBuilder {
             lon_center: None,
             url_template: "https://a.tile.osm.org/{z}/{x}/{y}.png".to_string(),
             tile_size: 256,
+            #[cfg(feature = "default-tile-fetcher")]
+            tile_fetcher: Box::new(fetchers::DefaultTileFetcher),
+            #[cfg(not(feature = "default-tile-fetcher"))]
+            tile_fetcher: Box::new(fetchers::NoopTileFetcher),
         }
     }
 }
@@ -119,6 +124,12 @@ impl StaticMapBuilder {
         self
     }
 
+    /// Sets a custom `TileFetcher`.
+    pub fn tile_fetcher(mut self, tile_fetcher: impl TileFetcher + 'static) -> Self {
+        self.tile_fetcher = Box::new(tile_fetcher);
+        self
+    }
+
     /// Consumes the builder.
     pub fn build(self) -> Result<StaticMap> {
         let bounds = BoundsBuilder::new()
@@ -134,6 +145,7 @@ impl StaticMapBuilder {
             url_template: self.url_template,
             tools: Vec::new(),
             bounds,
+            tile_fetcher: self.tile_fetcher,
         })
     }
 }
@@ -195,18 +207,12 @@ impl StaticMap {
             })
             .collect();
 
-        let tile_images: Vec<_> = tiles
-            .par_iter()
-            .map(|x| {
-                RequestBuilder::try_new(Method::GET, &x.2)
-                    .and_then(RequestBuilder::send)
-                    .and_then(Response::bytes)
-                    .map_err(|error| Error::TileError {
-                        error,
-                        url: x.2.clone(),
-                    })
-            })
-            .collect();
+        let tile_images = self.tile_fetcher.fetch(
+            &tiles
+                .iter()
+                .map(|(_, _, url)| url.as_ref())
+                .collect::<Vec<_>>(),
+        );
 
         for (tile, tile_image) in tiles.iter().zip(tile_images) {
             let (x, y) = (tile.0, tile.1);
