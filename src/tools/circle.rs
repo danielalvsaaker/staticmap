@@ -20,6 +20,7 @@ use tiny_skia::{FillRule, PathBuilder, PixmapMut, Stroke, Transform};
 ///     .build()
 ///     .unwrap();
 /// ```
+#[derive(Debug, Clone)]
 pub struct Circle {
     lat_coordinate: f64,
     lon_coordinate: f64,
@@ -30,6 +31,7 @@ pub struct Circle {
 }
 
 /// Builder for [Circle][Circle].
+#[derive(Debug, Clone)]
 pub struct CircleBuilder {
     lat_coordinate: Option<f64>,
     lon_coordinate: Option<f64>,

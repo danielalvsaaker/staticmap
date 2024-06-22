@@ -22,6 +22,7 @@ use tiny_skia::{self, PixmapMut, Transform};
 ///     .build()
 ///     .unwrap();
 /// ```
+#[derive(Debug, Clone)]
 pub struct Rect {
     north_lat_coordinate: f64,
     south_lat_coordinate: f64,
@@ -31,7 +32,7 @@ pub struct Rect {
 }
 
 /// Builder for [Rect][Rect].
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct RectBuilder {
     north_lat_coordinate: Option<f64>,
     south_lat_coordinate: Option<f64>,

@@ -10,7 +10,7 @@ pub use icon::{Icon, IconBuilder};
 pub use line::{Line, LineBuilder};
 pub use rect::{Rect, RectBuilder};
 
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 /// Path color.
 ///
 /// ## Example

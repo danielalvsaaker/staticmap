@@ -2,6 +2,7 @@ use crate::{lat_to_y, lon_to_x, tools::Tool};
 
 /// Helper struct for converting to pixels,
 /// and to pass information about map bounds to implementors of [Tool][Tool].
+#[derive(Debug)]
 pub struct Bounds {
     /// Height of the map in pixels.
     pub height: u32,
@@ -48,7 +49,7 @@ impl Bounds {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 /// Builder for [Bounds][Bounds].
 pub struct BoundsBuilder {
     lon_min: f64,
