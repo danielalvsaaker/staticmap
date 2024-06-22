@@ -28,6 +28,9 @@ Examples can be run with `cargo run --example <example name>`.
 ### Circle
 ![circle](/examples/results/circle.png)
 
+### Open Circle
+![opencircle](/examples/results/open_circle.png)
+
 ### Icon
 ![icon](/examples/results/icon.png)
 
