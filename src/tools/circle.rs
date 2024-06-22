@@ -4,7 +4,7 @@ use crate::{
     tools::{Color, Tool},
     x_to_lon, y_to_lat, Error, Result,
 };
-use tiny_skia::{FillRule, PathBuilder, PixmapMut, Transform};
+use tiny_skia::{FillRule, PathBuilder, PixmapMut, Stroke, Transform};
 
 /// Circle tool.
 /// Use [CircleBuilder][CircleBuilder] as an entrypoint.
@@ -26,6 +26,7 @@ pub struct Circle {
     color: Color,
     radius: f64,
     radius_in_meters: bool,
+    stroke_width: Option<f32>,
 }
 
 /// Builder for [Circle][Circle].
@@ -35,6 +36,7 @@ pub struct CircleBuilder {
     color: Color,
     radius: f64,
     radius_in_meters: bool,
+    stroke_width: Option<f32>,
 }
 
 impl Default for CircleBuilder {
@@ -45,6 +47,7 @@ impl Default for CircleBuilder {
             color: Color::default(),
             radius: 1.,
             radius_in_meters: false,
+            stroke_width: None,
         }
     }
 }
@@ -91,6 +94,20 @@ impl CircleBuilder {
         self
     }
 
+    /// Draw a filled circle (the default).
+    pub fn filled(mut self) -> Self {
+        self.stroke_width = None;
+        self
+    }
+
+    /// Draw an open circle.
+    /// Stroke `width` is in pixels, and must be >= 0.0.
+    /// When set to 0, a hairline stroking will be used.
+    pub fn stroke_width(mut self, width: f32) -> Self {
+        self.stroke_width = Some(width);
+        self
+    }
+
     /// Build the tool, consuming the builder.
     /// Returns an error if the builder is missing required fields.
     pub fn build(self) -> Result<Circle> {
@@ -104,6 +121,7 @@ impl CircleBuilder {
             color: self.color,
             radius: self.radius,
             radius_in_meters: self.radius_in_meters,
+            stroke_width: self.stroke_width,
         })
     }
 }
@@ -141,16 +159,27 @@ impl Tool for Circle {
 
         path_builder.push_circle(x as f32, y as f32, self.radius_px(bounds.zoom) as f32);
 
-        path_builder.close();
-
         if let Some(path) = path_builder.finish() {
-            pixmap.fill_path(
-                &path,
-                &self.color.0,
-                FillRule::default(),
-                Transform::default(),
-                None,
-            );
+            if let Some(width) = self.stroke_width {
+                pixmap.stroke_path(
+                    &path,
+                    &self.color.0,
+                    &Stroke {
+                        width,
+                        ..Default::default()
+                    },
+                    Transform::default(),
+                    None,
+                );
+            } else {
+                pixmap.fill_path(
+                    &path,
+                    &self.color.0,
+                    FillRule::default(),
+                    Transform::default(),
+                    None,
+                );
+            }
         }
     }
 }
