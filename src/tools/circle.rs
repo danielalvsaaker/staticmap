@@ -1,10 +1,10 @@
 use crate::{
     bounds::Bounds,
-    lat_to_y, lon_to_x,
+    lat_to_y, lon_to_x, m_to_px,
     tools::{Color, Tool},
     x_to_lon, y_to_lat, Error, Result,
 };
-use tiny_skia::{FillRule, PathBuilder, PixmapMut, Transform};
+use tiny_skia::{FillRule, PathBuilder, PixmapMut, Stroke, Transform};
 
 /// Circle tool.
 /// Use [CircleBuilder][CircleBuilder] as an entrypoint.
@@ -20,19 +20,25 @@ use tiny_skia::{FillRule, PathBuilder, PixmapMut, Transform};
 ///     .build()
 ///     .unwrap();
 /// ```
+#[derive(Debug, Clone)]
 pub struct Circle {
     lat_coordinate: f64,
     lon_coordinate: f64,
     color: Color,
-    radius: f32,
+    radius: f64,
+    radius_in_meters: bool,
+    stroke_width: Option<f32>,
 }
 
 /// Builder for [Circle][Circle].
+#[derive(Debug, Clone)]
 pub struct CircleBuilder {
     lat_coordinate: Option<f64>,
     lon_coordinate: Option<f64>,
     color: Color,
-    radius: f32,
+    radius: f64,
+    radius_in_meters: bool,
+    stroke_width: Option<f32>,
 }
 
 impl Default for CircleBuilder {
@@ -42,6 +48,8 @@ impl Default for CircleBuilder {
             lon_coordinate: None,
             color: Color::default(),
             radius: 1.,
+            radius_in_meters: false,
+            stroke_width: None,
         }
     }
 }
@@ -49,12 +57,7 @@ impl Default for CircleBuilder {
 impl CircleBuilder {
     /// Create a new builder with defaults.
     pub fn new() -> Self {
-        Self {
-            lat_coordinate: None,
-            lon_coordinate: None,
-            color: Color::default(),
-            radius: 1.,
-        }
+        Self::default()
     }
 
     /// **Required**.
@@ -81,7 +84,29 @@ impl CircleBuilder {
     /// Circle radius in pixels.
     /// Default is 1.0.
     pub fn radius(mut self, radius: f32) -> Self {
+        self.radius = radius as f64;
+        self.radius_in_meters = false;
+        self
+    }
+
+    /// Circle radius in meters.
+    pub fn radius_in_meters(mut self, radius: f64) -> Self {
         self.radius = radius;
+        self.radius_in_meters = true;
+        self
+    }
+
+    /// Draw a filled circle (the default).
+    pub fn filled(mut self) -> Self {
+        self.stroke_width = None;
+        self
+    }
+
+    /// Draw an open circle.
+    /// Stroke `width` is in pixels, and must be >= 0.0.
+    /// When set to 0, a hairline stroking will be used.
+    pub fn stroke_width(mut self, width: f32) -> Self {
+        self.stroke_width = Some(width);
         self
     }
 
@@ -97,13 +122,25 @@ impl CircleBuilder {
                 .ok_or(Error::BuildError("Longitude coordinate not supplied."))?,
             color: self.color,
             radius: self.radius,
+            radius_in_meters: self.radius_in_meters,
+            stroke_width: self.stroke_width,
         })
+    }
+}
+
+impl Circle {
+    fn radius_px(&self, zoom: u8) -> f64 {
+        if self.radius_in_meters {
+            m_to_px(self.radius, self.lat_coordinate, zoom)
+        } else {
+            self.radius
+        }
     }
 }
 
 impl Tool for Circle {
     fn extent(&self, zoom: u8, tile_size: f64) -> (f64, f64, f64, f64) {
-        let radius: f64 = self.radius.into();
+        let radius: f64 = self.radius_px(zoom);
 
         let x = lon_to_x(self.lon_coordinate, zoom);
         let y = lat_to_y(self.lat_coordinate, zoom);
@@ -122,18 +159,29 @@ impl Tool for Circle {
         let x = bounds.x_to_px(lon_to_x(self.lon_coordinate, bounds.zoom));
         let y = bounds.y_to_px(lat_to_y(self.lat_coordinate, bounds.zoom));
 
-        path_builder.push_circle(x as f32, y as f32, self.radius);
-
-        path_builder.close();
+        path_builder.push_circle(x as f32, y as f32, self.radius_px(bounds.zoom) as f32);
 
         if let Some(path) = path_builder.finish() {
-            pixmap.fill_path(
-                &path,
-                &self.color.0,
-                FillRule::default(),
-                Transform::default(),
-                None,
-            );
+            if let Some(width) = self.stroke_width {
+                pixmap.stroke_path(
+                    &path,
+                    &self.color.0,
+                    &Stroke {
+                        width,
+                        ..Default::default()
+                    },
+                    Transform::default(),
+                    None,
+                );
+            } else {
+                pixmap.fill_path(
+                    &path,
+                    &self.color.0,
+                    FillRule::default(),
+                    Transform::default(),
+                    None,
+                );
+            }
         }
     }
 }

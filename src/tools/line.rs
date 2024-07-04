@@ -18,6 +18,7 @@ use tiny_skia::{LineCap, PathBuilder, PixmapMut, Stroke, Transform};
 ///     .build()
 ///     .unwrap();
 /// ```
+#[derive(Debug, Clone)]
 pub struct Line {
     lat_coordinates: Vec<f64>,
     lon_coordinates: Vec<f64>,
@@ -28,6 +29,7 @@ pub struct Line {
 }
 
 /// Builder for [Line][Line].
+#[derive(Debug, Clone)]
 pub struct LineBuilder {
     lat_coordinates: Option<Vec<f64>>,
     lon_coordinates: Option<Vec<f64>>,

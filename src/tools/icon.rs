@@ -18,6 +18,7 @@ use tiny_skia::{Pixmap, PixmapMut, PixmapPaint, Transform};
 ///     .build()
 ///     .unwrap();
 /// ```
+#[derive(Debug, Clone)]
 pub struct Icon {
     lat_coordinate: f64,
     lon_coordinate: f64,
@@ -26,7 +27,7 @@ pub struct Icon {
     icon: Pixmap,
 }
 
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 /// Builder for [Icon][Icon].
 pub struct IconBuilder {
     lat_coordinate: Option<f64>,

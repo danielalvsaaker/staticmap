@@ -82,6 +82,12 @@ pub fn lat_to_y(mut lat: f64, zoom: u8) -> f64 {
         * 2_f64.powi(zoom.into())
 }
 
+/// Meters to pixels.
+/// See https://wiki.openstreetmap.org/wiki/Zoom_levels#Distance_per_pixel_math
+pub fn m_to_px(meters: f64, lat: f64, zoom: u8) -> f64 {
+    meters / (2.0 * PI * 6_378_137.0 * (lat * PI / 180.0).cos() / 2.0_f64.powi((zoom as i32) + 8))
+}
+
 /// X to longitude coordinate.
 pub fn x_to_lon(x: f64, zoom: u8) -> f64 {
     x / 2_f64.powi(zoom.into()) * 360_f64 - 180_f64

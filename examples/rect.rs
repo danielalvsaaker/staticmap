@@ -20,6 +20,7 @@ fn main() -> Result<(), Error> {
         .east_lon_coordinate(141.698469171195)
         .west_lon_coordinate(141.65625418708007)
         .color(Color::new(true, 0, 0, 255, 255))
+        .stroke_width(2.0)
         .build()?;
 
     map.add_tool(rect1);

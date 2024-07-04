@@ -4,7 +4,7 @@ use crate::{
     tools::{Color, Tool},
     Error, Result,
 };
-use tiny_skia::{self, PixmapMut, Transform};
+use tiny_skia::{self, PathBuilder, PixmapMut, Stroke, Transform};
 
 /// Rect tool.
 /// Use [RectBuilder][RectBuilder] as an entrypoint.
@@ -22,22 +22,25 @@ use tiny_skia::{self, PixmapMut, Transform};
 ///     .build()
 ///     .unwrap();
 /// ```
+#[derive(Debug, Clone)]
 pub struct Rect {
     north_lat_coordinate: f64,
     south_lat_coordinate: f64,
     east_lon_coordinate: f64,
     west_lon_coordinate: f64,
     color: Color,
+    stroke_width: Option<f32>,
 }
 
 /// Builder for [Rect][Rect].
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct RectBuilder {
     north_lat_coordinate: Option<f64>,
     south_lat_coordinate: Option<f64>,
     east_lon_coordinate: Option<f64>,
     west_lon_coordinate: Option<f64>,
     color: Color,
+    stroke_width: Option<f32>,
 }
 
 impl RectBuilder {
@@ -81,6 +84,20 @@ impl RectBuilder {
         self
     }
 
+    /// Draw a filled rectangle (the default).
+    pub fn filled(mut self) -> Self {
+        self.stroke_width = None;
+        self
+    }
+
+    /// Draw an open rectangle.
+    /// Stroke `width` is in pixels, and must be >= 0.0.
+    /// When set to 0, a hairline stroking will be used.
+    pub fn stroke_width(mut self, width: f32) -> Self {
+        self.stroke_width = Some(width);
+        self
+    }
+
     /// Build the tool, consuming the builder.
     /// Returns an error if the builder is missing required fields.
     pub fn build(self) -> Result<Rect> {
@@ -98,6 +115,7 @@ impl RectBuilder {
                 .west_lon_coordinate
                 .ok_or(Error::BuildError("West longitude coordinate not supplied."))?,
             color: self.color,
+            stroke_width: self.stroke_width,
         })
     }
 }
@@ -120,7 +138,20 @@ impl Tool for Rect {
 
         let rect = tiny_skia::Rect::from_ltrb(left as f32, top as f32, right as f32, bottom as f32);
         if let Some(rect) = rect {
-            pixmap.fill_rect(rect, &self.color.0, Transform::default(), None);
+            if let Some(width) = self.stroke_width {
+                pixmap.stroke_path(
+                    &PathBuilder::from_rect(rect),
+                    &self.color.0,
+                    &Stroke {
+                        width,
+                        ..Default::default()
+                    },
+                    Transform::default(),
+                    None,
+                );
+            } else {
+                pixmap.fill_rect(rect, &self.color.0, Transform::default(), None);
+            }
         }
     }
 }
