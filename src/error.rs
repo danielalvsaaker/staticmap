@@ -10,7 +10,7 @@ pub enum Error {
     /// Request error when fetching tile from a tile server.
     TileError {
         /// Internal error from the HTTP client.
-        error: attohttpc::Error,
+        error: Box<dyn std::error::Error>,
         /// The URL which failed.
         url: String,
     },
@@ -39,7 +39,7 @@ impl std::error::Error for Error {
         match *self {
             Error::PngEncodingError(ref error) => Some(error),
             Error::PngDecodingError(ref error) => Some(error),
-            Error::TileError { ref error, .. } => Some(error),
+            Error::TileError { ref error, .. } => Some(error.as_ref()),
             _ => None,
         }
     }
